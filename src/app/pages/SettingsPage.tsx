@@ -647,6 +647,7 @@ export function SettingsPage() {
   // ── Load existing settings on mount ───────────────────────────────────────
   useEffect(() => {
     if (!user) { setLoading(false); return; }
+    const currentUser = user;
     let cancelled = false;
 
     async function loadSettings() {
@@ -654,7 +655,7 @@ export function SettingsPage() {
         const { data, error } = await supabase
           .from('cabinet_settings')
           .select('cabinet_name,expert_name,logo_url,ai_provider,ai_api_key,perplexity_api_key,siren,siret,adresse,code_postal,ville,forme_juridique,code_naf,capital_social')
-          .eq('user_id', user.id)
+          .eq('user_id', currentUser.id)
           .maybeSingle();
 
         if (error) {
@@ -664,7 +665,7 @@ export function SettingsPage() {
         if (!cancelled && data) {
           // Decrypt the stored key (returns '' if not yet encrypted or if decryption fails)
           const decryptedKey = data.ai_api_key
-            ? await decryptApiKey(data.ai_api_key, user.id)
+            ? await decryptApiKey(data.ai_api_key, currentUser.id)
             : '';
 
           // Warn user if a key was stored but could not be decrypted locally
@@ -674,7 +675,7 @@ export function SettingsPage() {
 
           // Decrypt the Perplexity key
           const decryptedPerplexityKey = data.perplexity_api_key
-            ? await decryptApiKey(data.perplexity_api_key, user.id)
+            ? await decryptApiKey(data.perplexity_api_key, currentUser.id)
             : '';
 
           // Normalise ai_provider: DB default was 'anthropic', UI uses 'claude'/'openai'/'perplexity'

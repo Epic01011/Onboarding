@@ -939,7 +939,7 @@ export function Prospection() {
 
       // 2. Build the email
       const cabinetInfo = getCabinetInfo();
-      const cabinetName = cabinetInfo.name || 'Votre cabinet comptable';
+      const cabinetName = cabinetInfo.nom || 'Votre cabinet comptable';
       const versionLabel = `v${quote.version}`;
       const monthlyFormatted = quote.monthlyTotal.toFixed(2).replace('.', ',');
       const setupFormatted = quote.setupFees.toFixed(2).replace('.', ',');
@@ -996,7 +996,6 @@ export function Prospection() {
           : lead.nomSociete,
         subject,
         htmlContent,
-        emailConfig,
       });
 
       if (!emailResult.success) {
