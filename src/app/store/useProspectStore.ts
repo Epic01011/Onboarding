@@ -146,7 +146,7 @@ export interface ProspectInput {
 }
 
 export type ProspectSyncResult =
-  | { success: true }
+  | { success: true; id?: string }
   | { success: false; error: string };
 
 export type BatchImportResult =
@@ -292,7 +292,7 @@ export const useProspectStore = create<ProspectStore>((set, get) => ({
       }
 
       set(s => ({ prospects: [data as ProspectRow, ...s.prospects] }));
-      return { success: true };
+      return { success: true, id: (data as ProspectRow).id };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue';
       console.warn('[useProspectStore] addProspect exception:', message);

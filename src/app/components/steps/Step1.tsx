@@ -19,20 +19,31 @@ export function Step1() {
 
   // Track if we've already verified for the current SIREN to prevent double-fetch
   const lastVerifiedSiren = useRef('');
+  // Debounce timer for SIREN API lookup
+  const sirenDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real-time Luhn validation — uniquement pour les reprises (pas de SIREN en création)
   useEffect(() => {
     if (isCreation) return;
+
+    if (sirenDebounceRef.current) clearTimeout(sirenDebounceRef.current);
+
     if (cleanSiren.length === 9) {
       const isValid = validateSIREN(cleanSiren);
       setSirenValid(isValid);
       if (isValid && !sirenVerified && lastVerifiedSiren.current !== cleanSiren) {
-        verifySiren(cleanSiren);
+        sirenDebounceRef.current = setTimeout(() => {
+          verifySiren(cleanSiren);
+        }, 500);
       }
     } else {
       setSirenValid(null);
       setSirenVerified(false);
     }
+
+    return () => {
+      if (sirenDebounceRef.current) clearTimeout(sirenDebounceRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleanSiren, isCreation]);
 

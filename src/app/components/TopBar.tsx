@@ -1,4 +1,5 @@
 import { useOnboarding } from '../context/OnboardingContext';
+import { Progress } from './ui/progress';
 
 export function TopBar() {
   const { currentStep, stepStatuses, clientData, activeSteps } = useOnboarding();
@@ -27,19 +28,7 @@ export function TopBar() {
           )}
         </div>
         <div className="flex items-center gap-2 mt-1.5">
-          <div className="flex gap-0.5 flex-1 max-w-xs">
-            {activeSteps.map((_, i) => {
-              const status = stepStatuses[i] ?? 'pending';
-              return (
-                <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                  status === 'completed' ? 'bg-emerald-500' :
-                  status === 'active' ? 'bg-blue-400' :
-                  status === 'skipped' ? 'bg-gray-200' :
-                  'bg-gray-100'
-                }`} />
-              );
-            })}
-          </div>
+          <Progress value={progress} className="flex-1 max-w-xs h-1.5" />
           <span className="text-xs text-gray-400 flex-shrink-0">{progress}%</span>
         </div>
       </div>
