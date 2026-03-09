@@ -546,7 +546,14 @@ export async function saveProspectAndQuote(
       prospectId = (newProspect as { id: string }).id;
     }
 
-    // ── 2. Insert the quote linked to the prospect (no client_id yet) ───────
+    // ── 2. Compute the next version number for this prospect ────────────────
+    const { count: existingCount } = await supabase
+      .from('quotes')
+      .select('id', { count: 'exact', head: true })
+      .eq('prospect_id', prospectId);
+    const nextVersion = (existingCount ?? 0) + 1;
+
+    // ── 3. Insert the quote linked to the prospect (no client_id yet) ───────
     const { data: quoteData, error: quoteError } = await supabase
       .from('quotes')
       .insert({
@@ -555,6 +562,7 @@ export async function saveProspectAndQuote(
         monthly_total: quote.monthlyTotal,
         setup_fees: quote.setupFees,
         quote_data: quote.quoteData,
+        version: nextVersion,
       })
       .select('id')
       .single();
@@ -689,6 +697,8 @@ export interface ValidatedQuote {
   monthlyTotal: number;
   setupFees: number;
   quoteData: Record<string, unknown>;
+  /** Statut du devis — présent uniquement quand explicitement sélectionné depuis Supabase */
+  status?: QuoteStatus;
 }
 
 export async function getValidatedQuotes(): Promise<
@@ -711,6 +721,50 @@ export async function getValidatedQuotes(): Promise<
         const c = asClientRecord(row.clients);
         return {
           quoteId: row.id as string,
+          clientName: (c.client_name as string) ?? '',
+          clientEmail: (c.client_email as string | null) ?? null,
+          siret: (c.siret as string | null) ?? null,
+          legalForm: (c.legal_form as string | null) ?? null,
+          taxRegime: (c.tax_regime as string | null) ?? null,
+          activity: (c.secteur_activite as string | null) ?? null,
+          monthlyTotal: (row.monthly_total as number) ?? 0,
+          setupFees: (row.setup_fees as number) ?? 0,
+          quoteData: (row.quote_data as Record<string, unknown>) ?? {},
+        };
+      });
+
+    return { success: true, quotes };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Récupère les devis aux statuts "VALIDATED" et "SENT" pour la page Lettre de Mission.
+ * Inclut le champ `status` pour permettre le suivi visuel de la signature électronique.
+ */
+export async function getQuotesForLDM(): Promise<
+  { success: true; quotes: ValidatedQuote[] } | { success: false; error: string }
+> {
+  try {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, status, monthly_total, setup_fees, quote_data, clients(id, client_name, client_email, siret, legal_form, tax_regime, secteur_activite)')
+      .in('status', ['VALIDATED', 'SENT'])
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const quotes: ValidatedQuote[] = (data ?? [])
+      .filter(row => row.clients !== null)
+      .map(row => {
+        const c = asClientRecord(row.clients);
+        return {
+          quoteId: row.id as string,
+          status: (row.status as QuoteStatus) ?? 'VALIDATED',
           clientName: (c.client_name as string) ?? '',
           clientEmail: (c.client_email as string | null) ?? null,
           siret: (c.siret as string | null) ?? null,
@@ -1273,5 +1327,88 @@ export async function getSentEmails(): Promise<{
   } catch (err: unknown) {
     console.warn('[supabaseSync] getSentEmails:', err instanceof Error ? err.message : err);
     return { success: false, emails: [], error: err instanceof Error ? err.message : 'Erreur inconnue' };
+  }
+}
+
+// ─── ProspectQuote (quotes listed in the prospect detail view) ────────────────
+
+export interface ProspectQuote {
+  id: string;
+  version: number;
+  status: string;
+  monthlyTotal: number;
+  setupFees: number;
+  createdAt: string;
+  acceptToken: string | null;
+}
+
+/**
+ * Récupère tous les devis associés à un prospect, triés du plus récent au plus
+ * ancien.
+ *
+ * Utilisé par la vue détaillée d'un prospect (Sheet) dans Prospection.tsx pour
+ * afficher le tableau des devis avec versioning.
+ */
+export async function getQuotesByProspect(
+  prospectId: string
+): Promise<{ success: true; quotes: ProspectQuote[] } | { success: false; error: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, version, status, monthly_total, setup_fees, created_at, accept_token')
+      .eq('prospect_id', prospectId)
+      .order('version', { ascending: false });
+
+    if (error) {
+      console.warn('[supabaseSync] getQuotesByProspect error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    const quotes: ProspectQuote[] = (data ?? []).map(row => ({
+      id: row.id as string,
+      version: (row.version as number) ?? 1,
+      status: row.status as string,
+      monthlyTotal: (row.monthly_total as number) ?? 0,
+      setupFees: (row.setup_fees as number) ?? 0,
+      createdAt: row.created_at as string,
+      acceptToken: (row.accept_token as string | null) ?? null,
+    }));
+
+    return { success: true, quotes };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.warn('[supabaseSync] getQuotesByProspect exception:', message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Génère un token UUID d'acceptation pour un devis et le persiste en base.
+ * Passe simultanément le statut du devis à 'SENT'.
+ *
+ * Retourne le token généré pour construction du lien magique d'acceptation.
+ */
+export async function generateQuoteAcceptToken(
+  quoteId: string
+): Promise<{ success: true; token: string } | { success: false; error: string }> {
+  try {
+    // Generate a v4-style UUID token client-side via crypto
+    const token = crypto.randomUUID();
+
+    const { error } = await supabase
+      .from('quotes')
+      .update({ accept_token: token, status: 'SENT' })
+      .eq('id', quoteId);
+
+    if (error) {
+      console.warn('[supabaseSync] generateQuoteAcceptToken error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, token };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.warn('[supabaseSync] generateQuoteAcceptToken exception:', message);
+    return { success: false, error: message };
   }
 }

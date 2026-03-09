@@ -8,7 +8,7 @@ import {
   Eye, MousePointerClick, Sparkles, PhoneCall, Linkedin,
   TrendingUp, CalendarDays, KanbanSquare, List, Map as MapIcon,
   Zap, CalendarCheck, PartyPopper, XCircle, Clock, ArrowLeft,
-  Download, Upload, Trash2, Pencil,
+  Download, Upload, Trash2, Pencil, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
@@ -28,7 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import {
   type Prospect, type ProspectSource, type ProspectDirigeant,
   searchProspects,
@@ -37,12 +37,14 @@ import { EmailCampaignModal, type SequenceStepConfig } from '../components/Email
 import { ProspectKanban, type KanbanColumn, statusToKanban, kanbanToStatus } from '../components/ProspectKanban';
 import { ProspectMapView } from '../components/ProspectMapView';
 import { computeLeadScore, scoreColorClass, getCabinetSpecialty, type CabinetSpecialty } from '../utils/leadScoring';
-import { getCabinetInfo, getServiceConnections } from '../utils/servicesStorage';
+import { getCabinetInfo, getServiceConnections, getEmailConfig } from '../utils/servicesStorage';
 import { ExcelImportModal } from '../components/ExcelImportModal';
 import { exportProspectsToExcel } from '../utils/excelUtils';
 import { MultiSelectFilter } from '../components/MultiSelectFilter';
 import type { RsvpStatus } from './EventsCampaign';
 import { useProspectStore, type ProspectRow } from '../store/useProspectStore';
+import { getQuotesByProspect, generateQuoteAcceptToken, type ProspectQuote } from '../utils/supabaseSync';
+import { sendEmail } from '../services/emailService';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -273,6 +275,7 @@ export function Prospection() {
 
   // ── Sheet (prospect detail) ───────────────────────────────────────────────
   const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetTab, setSheetTab] = useState<'details' | 'timeline'>('details');
 
   // ── Sheet edit mode ───────────────────────────────────────────────────────
   const [isEditingSheet, setIsEditingSheet] = useState(false);
@@ -290,6 +293,11 @@ export function Prospection() {
 
   // ── Mass delete confirmation ──────────────────────────────────────────────
   const [showMassDeleteConfirm, setShowMassDeleteConfirm] = useState(false);
+
+  // ── Quotes map (keyed by prospect id) ────────────────────────────────────
+  const [quotesMap, setQuotesMap] = useState<Record<string, ProspectQuote[]>>({});
+  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [sendingQuoteId, setSendingQuoteId] = useState<string | null>(null);
 
   // ── Notes (persisted per siren) ───────────────────────────────────────────
   const statusMapRef                        = useRef<Record<string, LeadStatus>>({});
@@ -311,14 +319,31 @@ export function Prospection() {
     setDraftEstimatedValue(lead?.estimatedValue != null ? String(lead.estimatedValue) : '');
     setDraftNextActionDate(lead?.nextActionDate ?? '');
     setCrmSaved(false);
-    // Reset edit mode whenever we switch prospects
+    // Reset edit mode and tab whenever we switch prospects
     setIsEditingSheet(false);
+    setSheetTab('details');
   }, [sheetId, leads, notesMap]);
 
   // ── Load DB prospects on mount ────────────────────────────────────────────
   useEffect(() => {
     fetchProspects();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Load quotes when a prospect sheet opens ───────────────────────────────
+  useEffect(() => {
+    if (!sheetId) return;
+    // Only fetch if we don't already have quotes loaded for this prospect
+    if (quotesMap[sheetId] !== undefined) return;
+    const prospectRow = storeProspects.find(p => p.id === sheetId);
+    if (!prospectRow) return;
+    setQuotesLoading(true);
+    getQuotesByProspect(prospectRow.id).then(result => {
+      if (result.success) {
+        setQuotesMap(prev => ({ ...prev, [sheetId]: result.quotes }));
+      }
+      setQuotesLoading(false);
+    });
+  }, [sheetId, storeProspects, quotesMap]);
 
   // ── Sync store.prospects → local leads (initial load only) ───────────────
   useEffect(() => {
@@ -882,6 +907,117 @@ export function Prospection() {
   const openRate      = sentLeads.length > 0 ? Math.round((openedLeads.length / sentLeads.length) * 100) : 0;
   const clickRate     = sentLeads.length > 0 ? Math.round((clickedLeads.length / sentLeads.length) * 100) : 0;
 
+  // ── Send quote with magic acceptance link ────────────────────────────────
+  async function handleSendQuote(quote: ProspectQuote) {
+    if (!sheetId) return;
+    const lead = leads.find(l => l.id === sheetId);
+    if (!lead) return;
+
+    const emailConfig = getEmailConfig();
+    if (!emailConfig) {
+      toast.error('Aucune configuration email trouvée. Configurez votre compte email dans les Paramètres.');
+      return;
+    }
+
+    const contactEmail = lead.email;
+    if (!contactEmail) {
+      toast.error('Aucun email de contact renseigné pour ce prospect.');
+      return;
+    }
+
+    setSendingQuoteId(quote.id);
+    try {
+      // 1. Generate token and mark quote as SENT
+      const tokenResult = await generateQuoteAcceptToken(quote.id);
+      if (!tokenResult.success) {
+        toast.error(`Erreur lors de la génération du lien : ${tokenResult.error}`);
+        return;
+      }
+
+      const appBaseUrl = window.location.origin;
+      const acceptLink = `${appBaseUrl}/api/accept-quote?token=${tokenResult.token}`;
+
+      // 2. Build the email
+      const cabinetInfo = getCabinetInfo();
+      const cabinetName = cabinetInfo.name || 'Votre cabinet comptable';
+      const versionLabel = `v${quote.version}`;
+      const monthlyFormatted = quote.monthlyTotal.toFixed(2).replace('.', ',');
+      const setupFormatted = quote.setupFees.toFixed(2).replace('.', ',');
+
+      const subject = `Votre devis ${versionLabel} — ${monthlyFormatted} € HT / mois`;
+      const htmlContent = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;padding:2rem;margin:0;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden;">
+    <div style="background:#1d4ed8;padding:2rem;text-align:center;">
+      <h1 style="color:#fff;margin:0;font-size:1.5rem;font-weight:700;">${cabinetName}</h1>
+      <p style="color:#bfdbfe;margin:.5rem 0 0;font-size:.875rem;">Votre proposition comptable personnalisée</p>
+    </div>
+    <div style="padding:2rem;">
+      <p style="color:#374151;font-size:1rem;margin:0 0 1rem;">Bonjour,</p>
+      <p style="color:#374151;font-size:1rem;line-height:1.6;margin:0 0 1.5rem;">
+        Nous avons le plaisir de vous adresser votre devis <strong>${versionLabel}</strong> pour la mission comptable de <strong>${lead.nomSociete}</strong>.
+      </p>
+      <div style="background:#f3f4f6;border-radius:8px;padding:1.5rem;margin:0 0 1.5rem;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="color:#6b7280;font-size:.875rem;padding:.25rem 0;">Honoraires mensuels HT</td>
+            <td style="color:#111827;font-weight:700;font-size:1.125rem;text-align:right;">${monthlyFormatted} €</td>
+          </tr>
+          ${quote.setupFees > 0 ? `<tr>
+            <td style="color:#6b7280;font-size:.875rem;padding:.25rem 0;">Frais de démarrage (une fois)</td>
+            <td style="color:#111827;font-weight:600;text-align:right;">${setupFormatted} €</td>
+          </tr>` : ''}
+        </table>
+      </div>
+      <p style="color:#374151;font-size:1rem;line-height:1.6;margin:0 0 2rem;">
+        Pour accepter ce devis et démarrer notre collaboration, cliquez sur le bouton ci-dessous :
+      </p>
+      <div style="text-align:center;margin:0 0 2rem;">
+        <a href="${acceptLink}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;font-size:1rem;font-weight:700;padding:.875rem 2.5rem;border-radius:8px;">
+          ✓ J'accepte ce devis
+        </a>
+      </div>
+      <p style="color:#9ca3af;font-size:.75rem;line-height:1.5;margin:0;border-top:1px solid #f3f4f6;padding-top:1.5rem;">
+        Ce lien est personnel et sécurisé. En cas de problème, contactez-nous directement.<br/>
+        ${cabinetName} • ${cabinetInfo.adresse || ''} ${cabinetInfo.codePostal || ''} ${cabinetInfo.ville || ''}
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      // 3. Send the email via /api/send-email
+      const emailResult = await sendEmail({
+        to: contactEmail,
+        toName: lead.dirigeantPrincipal
+          ? `${lead.dirigeantPrincipal.prenom ?? ''} ${lead.dirigeantPrincipal.nom ?? ''}`.trim()
+          : lead.nomSociete,
+        subject,
+        htmlContent,
+        emailConfig,
+      });
+
+      if (!emailResult.success) {
+        toast.error(`Échec de l'envoi : ${emailResult.error ?? 'Erreur inconnue'}`);
+        return;
+      }
+
+      // 4. Update local quotes state to reflect SENT status
+      setQuotesMap(prev => ({
+        ...prev,
+        [sheetId]: (prev[sheetId] ?? []).map(q =>
+          q.id === quote.id ? { ...q, status: 'SENT', acceptToken: tokenResult.token } : q
+        ),
+      }));
+
+      toast.success(`Devis ${versionLabel} envoyé à ${contactEmail} avec lien d'acceptation.`);
+    } finally {
+      setSendingQuoteId(null);
+    }
+  }
+
   // ── Excel Import/Export handlers ───────────────────────────────────────────
   function handleExportExcel() {
     if (filtered.length === 0) return;
@@ -1347,6 +1483,7 @@ export function Prospection() {
                 callLogs: l.callLogs,
                 estimatedValue: l.estimatedValue,
                 nextActionDate: l.nextActionDate,
+                leadScore: l.leadScore,
               }))}
               onMoveCard={moveCard}
               onCardClick={id => setSheetId(id)}
@@ -1626,8 +1763,36 @@ export function Prospection() {
                 </div>
               </SheetHeader>
 
+              {/* ── Tab navigation: Détails | Timeline ── */}
+              <div className="flex-shrink-0 border-b border-gray-100 px-6 pt-3 pb-0 bg-white">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setSheetTab('details')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors ${
+                      sheetTab === 'details'
+                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    📋 Détails
+                  </button>
+                  <button
+                    onClick={() => setSheetTab('timeline')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors ${
+                      sheetTab === 'timeline'
+                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🕐 Timeline
+                  </button>
+                </div>
+              </div>
+
               {/* ── Scrollable body ── */}
               <div className="flex-1 overflow-y-auto">
+                {sheetTab === 'details' ? (
+                  <>
 
                 {/* ── Inline edit form (visible when isEditingSheet) ── */}
                 {isEditingSheet && (
@@ -1983,6 +2148,90 @@ export function Prospection() {
                   </section>
                 )}
 
+                {/* Devis liés au prospect */}
+                <section className="px-6 py-5 space-y-3 border-b border-gray-100">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> Devis
+                  </h3>
+                  {quotesLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Chargement des devis…
+                    </div>
+                  ) : (quotesMap[sheetId ?? ''] ?? []).length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">Aucun devis généré pour ce prospect.</p>
+                  ) : (
+                    <div className="overflow-x-auto -mx-6 px-6">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-2 pr-3 font-semibold text-gray-500">Version</th>
+                            <th className="text-left py-2 pr-3 font-semibold text-gray-500">Statut</th>
+                            <th className="text-right py-2 pr-3 font-semibold text-gray-500">Mensuel HT</th>
+                            <th className="text-right py-2 pr-3 font-semibold text-gray-500">Démarrage</th>
+                            <th className="py-2 font-semibold text-gray-500">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(quotesMap[sheetId ?? ''] ?? []).map(q => {
+                            const statusLabel: Record<string, string> = {
+                              DRAFT: 'Brouillon',
+                              SENT: 'Envoyé',
+                              ACCEPTED: 'Accepté',
+                              VALIDATED: 'Validé',
+                              SIGNED: 'Signé',
+                              PENDING_ONBOARDING: 'En attente',
+                              ARCHIVED: 'Archivé',
+                            };
+                            const statusColor: Record<string, string> = {
+                              DRAFT: 'bg-gray-100 text-gray-600',
+                              SENT: 'bg-blue-100 text-blue-700',
+                              ACCEPTED: 'bg-emerald-100 text-emerald-700',
+                              VALIDATED: 'bg-green-100 text-green-700',
+                              SIGNED: 'bg-violet-100 text-violet-700',
+                              PENDING_ONBOARDING: 'bg-amber-100 text-amber-700',
+                              ARCHIVED: 'bg-gray-100 text-gray-500',
+                            };
+                            const canSend = q.status !== 'ACCEPTED' && q.status !== 'VALIDATED' && q.status !== 'SIGNED';
+                            return (
+                              <tr key={q.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                                <td className="py-2 pr-3 font-semibold text-gray-800">v{q.version}</td>
+                                <td className="py-2 pr-3">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${statusColor[q.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                    {statusLabel[q.status] ?? q.status}
+                                  </span>
+                                </td>
+                                <td className="py-2 pr-3 text-right font-medium text-gray-900">
+                                  {q.monthlyTotal.toFixed(2).replace('.', ',')} €
+                                </td>
+                                <td className="py-2 pr-3 text-right text-gray-600">
+                                  {q.setupFees > 0 ? `${q.setupFees.toFixed(2).replace('.', ',')} €` : '—'}
+                                </td>
+                                <td className="py-2">
+                                  {canSend && (
+                                    <button
+                                      onClick={() => handleSendQuote(q)}
+                                      disabled={sendingQuoteId === q.id}
+                                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      {sendingQuoteId === q.id
+                                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Envoi…</>
+                                        : <><Send className="w-3 h-3" /> Envoyer</>
+                                      }
+                                    </button>
+                                  )}
+                                  {!canSend && (
+                                    <span className="text-[11px] text-gray-400 italic">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
                 {/* Notes */}
                 <section className="px-6 py-5 space-y-3">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -2014,6 +2263,10 @@ export function Prospection() {
                     </button>
                   </div>
                 </section>
+                  </>
+                ) : (
+                  <ProspectTimeline lead={activeLead} storeProspects={storeProspects} />
+                )}
               </div>
 
               {/* ── Sheet footer — quick actions ── */}
@@ -2311,5 +2564,165 @@ function EventStatusBadge({ status }: { status: RsvpStatus }) {
       {cfg.icon}
       {cfg.label}
     </span>
+  );
+}
+
+// ─── Timeline ─────────────────────────────────────────────────────────────────
+
+interface TimelineEvent {
+  date: Date;
+  icon: string;
+  label: string;
+  detail?: string;
+  color: string;
+}
+
+function ProspectTimeline({
+  lead,
+  storeProspects,
+}: {
+  lead: LeadEntry;
+  storeProspects: ProspectRow[];
+}) {
+  const storeRow = storeProspects.find(p => p.id === lead.id);
+
+  const events: TimelineEvent[] = useMemo(() => {
+    const raw: TimelineEvent[] = [];
+
+    // 1. Prospect créé
+    const createdAt = storeRow?.created_at;
+    if (createdAt) {
+      raw.push({
+        date: new Date(createdAt),
+        icon: '🏢',
+        label: 'Prospect ajouté',
+        detail: lead.nomSociete,
+        color: 'bg-gray-100 text-gray-600 border-gray-200',
+      });
+    }
+
+    // 2. Email initial envoyé
+    if (lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '📧',
+        label: 'Email initial envoyé',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
+      });
+    }
+
+    // 3. Email ouvert (exact open timestamp not stored; approximate with sent date)
+    if (lead.openCount > 0 && lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '👁️',
+        label: `Email ouvert ${lead.openCount} fois`,
+        detail: 'Horodatage exact non disponible — daté à l\'envoi',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      });
+    }
+
+    // 4. Lien cliqué (exact click timestamp not stored; approximate with sent date)
+    if (lead.clicked && lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '🖱️',
+        label: 'Lien / devis cliqué',
+        detail: 'Horodatage exact non disponible — daté à l\'envoi',
+        color: 'bg-violet-50 text-violet-700 border-violet-200',
+      });
+    }
+
+    // 5. Relances planifiées
+    if (lead.sequenceStep > 0 && lead.nextFollowUpDate) {
+      raw.push({
+        date: new Date(lead.nextFollowUpDate),
+        icon: '🔁',
+        label: `Relance ${lead.sequenceStep} planifiée`,
+        color: 'bg-amber-50 text-amber-700 border-amber-200',
+      });
+    }
+
+    // 6. Call logs (format: "[DD/MM/YYYY, HH:MM] note" from toLocaleString)
+    for (const log of lead.callLogs) {
+      const bracketMatch = log.match(/^\[([^\]]+)\]/);
+      const logDate = bracketMatch
+        ? (() => {
+            // parse "DD/MM/YYYY, HH:MM:SS" locale format
+            const parts = bracketMatch[1].split(/[\s,\/]+/);
+            if (parts.length >= 5) {
+              const [d, m, y, h, min] = parts;
+              const dd = Number(d), mm = Number(m), yyyy = Number(y), hh = Number(h), mi = Number(min);
+              if (
+                !isNaN(dd) && !isNaN(mm) && !isNaN(yyyy) && !isNaN(hh) && !isNaN(mi) &&
+                dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yyyy > 2000
+              ) {
+                const parsed = new Date(
+                  `${String(yyyy)}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mi).padStart(2, '0')}:00`,
+                );
+                if (!isNaN(parsed.getTime())) return parsed;
+              }
+            }
+            return new Date();
+          })()
+        : new Date();
+      raw.push({
+        date: logDate,
+        icon: '📞',
+        label: 'Appel journalisé',
+        detail: bracketMatch ? log.replace(/^\[[^\]]+\]\s*/, '') : log,
+        color: 'bg-purple-50 text-purple-700 border-purple-200',
+      });
+    }
+
+    // 7. Next action date
+    if (lead.nextActionDate) {
+      raw.push({
+        date: new Date(lead.nextActionDate),
+        icon: '📅',
+        label: 'Prochaine action prévue',
+        color: 'bg-sky-50 text-sky-700 border-sky-200',
+      });
+    }
+
+    return raw.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [lead, storeRow]);
+
+  if (events.length === 0) {
+    return (
+      <div className="px-6 py-10 text-center text-xs text-gray-400 italic">
+        Aucun événement enregistré pour ce prospect.
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-6 py-5">
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-4">
+        <Clock className="w-3.5 h-3.5" /> Historique chronologique
+      </h3>
+      <ol className="relative border-l border-gray-200 space-y-5 ml-2">
+        {events.map((event, i) => (
+          <li key={i} className="ml-4">
+            <span className="absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-sm select-none">
+              {event.icon}
+            </span>
+            <div className={`rounded-lg border px-3 py-2 ${event.color}`}>
+              <p className="text-xs font-semibold">{event.label}</p>
+              {event.detail && (
+                <p className="text-[11px] mt-0.5 opacity-80 leading-relaxed">{event.detail}</p>
+              )}
+              <p className="text-[10px] mt-1 opacity-60">
+                {event.date.toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

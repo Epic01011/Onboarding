@@ -3,8 +3,8 @@
  *
  * Service de génération de brouillons d'emails IA pour l'Inbox IA.
  *
- * Construit le prompt système optimal et appelle Claude (Anthropic) ou OpenAI
- * via la serverless function /api/generate-ai-email (proxy CORS-safe).
+ * Construit le prompt système optimal et appelle Claude (Anthropic), OpenAI ou
+ * Perplexity via la serverless function /api/generate-ai-email (proxy CORS-safe).
  *
  * La réponse est formatée en HTML incluant la signature de l'expert et le logo
  * du cabinet en pied de message.
@@ -115,7 +115,7 @@ function buildSignatureHtml(cabinetInfo: CabinetInfo): string {
 const AI_CALL_TIMEOUT_MS = 30_000;
 
 async function callAiApi(
-  provider: 'claude' | 'openai',
+  provider: 'claude' | 'openai' | 'perplexity',
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
@@ -170,7 +170,10 @@ export async function generateEmailDraft(
 ): Promise<GeneratedDraft> {
   const { clientEmail, cabinetInfo } = options;
   const provider = cabinetInfo.aiProvider ?? 'claude';
-  const apiKey = cabinetInfo.aiApiKey ?? '';
+  // Use the Perplexity key when Perplexity is selected, otherwise the main AI key
+  const apiKey = provider === 'perplexity'
+    ? (cabinetInfo.perplexityApiKey ?? '')
+    : (cabinetInfo.aiApiKey ?? '');
 
   const replySubject = clientEmail.subject.startsWith('Re:')
     ? clientEmail.subject

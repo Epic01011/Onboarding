@@ -17,7 +17,7 @@ export type InvoiceRange = '<10' | '10-20' | '20-40' | '40-80' | '80-200' | '200
 export type Digitalization = 'numerique' | 'papier';
 export type TvaFrequency = 'Mensuel' | 'Trimestriel' | 'Annuel';
 /** All possible lifecycle statuses for a quote, shared with the Supabase schema */
-export type QuoteStatus = 'DRAFT' | 'SENT' | 'VALIDATED' | 'SIGNED' | 'PENDING_ONBOARDING';
+export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'VALIDATED' | 'SIGNED' | 'PENDING_ONBOARDING';
 
 export interface CompanyProfile {
   /** Numéro SIREN (9 chiffres) */

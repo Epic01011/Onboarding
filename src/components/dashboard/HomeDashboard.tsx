@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, X, BookOpen, Handshake, FolderKanban,
-  HardDrive, TrendingUp, Send,
+  HardDrive, TrendingUp, Send, Zap,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -309,6 +309,32 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               {kpis.aiPending > 0
                 ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
                 : 'Emails & brouillons IA'}
+            </p>
+          </div>
+        </button>
+
+        {/* 6. Centre d'action unifié */}
+        <button
+          onClick={() => navigate('/action-center')}
+          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
+            kpis.overdues > 0
+              ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
+              : 'bg-white border-slate-200/60 hover:border-violet-200'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
+          }`}>
+            <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
+          </div>
+          <div>
+            <p className={`font-semibold text-sm ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
+              Centre d'action
+            </p>
+            <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-muted-foreground'}`}>
+              {kpis.overdues > 0
+                ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
+                : 'Relances & tâches unifiées'}
             </p>
           </div>
         </button>
