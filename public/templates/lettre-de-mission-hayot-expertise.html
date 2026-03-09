@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lettre de Mission - Hayot Expertise</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .document {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 60px 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        /* EN-TÊTE */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #003d7a;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .cabinet-info h1 {
+            font-size: 28px;
+            color: #003d7a;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        
+        .cabinet-info p {
+            font-size: 11px;
+            color: #666;
+            margin: 2px 0;
+        }
+        
+        .document-meta {
+            text-align: right;
+            font-size: 11px;
+        }
+        
+        .document-meta .numero {
+            font-weight: bold;
+            color: #003d7a;
+            margin-bottom: 8px;
+        }
+        
+        /* TITRE */
+        .titre {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .titre h2 {
+            font-size: 24px;
+            color: white;
+            background: #003d7a;
+            padding: 15px 20px;
+            display: inline-block;
+            letter-spacing: 3px;
+            font-weight: bold;
+        }
+        
+        /* PARTIES */
+        .parties {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        .partie {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .partie.cabinet {
+            background: #f0f4ff;
+            border: 2px solid #003d7a;
+        }
+        
+        .partie.client {
+            background: #f9f9f9;
+        }
+        
+        .partie h3 {
+            font-size: 11px;
+            font-weight: bold;
+            color: #003d7a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px;
+        }
+        
+        .partie p {
+            font-size: 12px;
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+        
+        .partie .label {
+            color: #666;
+            font-size: 10px;
+        }
+        
+        /* SECTIONS */
+        section {
+            margin: 35px 0;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            background: #003d7a;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-left: 5px solid #0056b3;
+        }
+        
+        .section-content {
+            padding: 0 16px;
+        }
+        
+        .section-content p {
+            font-size: 12px;
+            text-align: justify;
+            margin-bottom: 12px;
+            line-height: 1.7;
+        }
+        
+        /* PRÉSENTATION DU CABINET */
+        .presentation-cabinet {
+            background: #f0f4ff;
+            padding: 20px;
+            border-left: 5px solid #003d7a;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+        
+        .presentation-cabinet h4 {
+            font-size: 12px;
+            color: #003d7a;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .presentation-cabinet ul {
+            margin-left: 20px;
+            font-size: 11px;
+        }
+        
+        .presentation-cabinet li {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+        
+        /* GRILLE TARIFAIRE */
+        .grille-tarifaire {
+            background: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .grille-tarifaire h4 {
+            font-size: 12px;
+            color: #003d7a;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .tarif-category {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+        
+        .tarif-category-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        
+        .tarif-category-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .tarif-category-value {
+            font-size: 11px;
+            color: #003d7a;
+            font-weight: bold;
+        }
+        
+        .tarif-category-desc {
+            font-size: 10px;
+            color: #666;
+        }
+        
+        /* TABLEAU INCLUS/HORS FORFAIT */
+        .inclus-hors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .inclus-hors-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .inclus-hors-box.inclus {
+            border-left: 4px solid #28a745;
+            background: #f1f9f5;
+        }
+        
+        .inclus-hors-box.hors {
+            border-left: 4px solid #dc3545;
+            background: #fef3f4;
+        }
+        
+        .inclus-hors-box h5 {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .inclus-hors-box.inclus h5 {
+            color: #28a745;
+        }
+        
+        .inclus-hors-box.hors h5 {
+            color: #dc3545;
+        }
+        
+        .inclus-hors-box ul {
+            margin-left: 18px;
+            font-size: 11px;
+        }
+        
+        .inclus-hors-box li {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+        
+        /* ASSURANCE RC */
+        .assurance-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .assurance-box h4 {
+            font-size: 11px;
+            font-weight: bold;
+            color: #d39e00;
+            margin-bottom: 8px;
+        }
+        
+        .assurance-box p {
+            font-size: 11px;
+            color: #664d03;
+        }
+        
+        /* PÉNALITÉS */
+        .penalites-box {
+            background: #ffe5e5;
+            border: 1px solid #ffcccc;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .penalites-box h4 {
+            font-size: 11px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 8px;
+        }
+        
+        .penalites-box p {
+            font-size: 11px;
+            color: #721c24;
+        }
+        
+        /* CLAUSE RÉVISION */
+        .revision-box {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .revision-box h4 {
+            font-size: 11px;
+            font-weight: bold;
+            color: #0066cc;
+            margin-bottom: 8px;
+        }
+        
+        .revision-box p {
+            font-size: 11px;
+            color: #004399;
+        }
+        
+        /* SIGNATURES */
+        .signatures {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+        
+        .signature-block {
+            text-align: left;
+        }
+        
+        .signature-block p {
+            font-size: 11px;
+            margin: 4px 0;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #333;
+            height: 60px;
+            margin: 10px 0;
+        }
+        
+        .signature-label {
+            color: #666;
+            font-size: 10px;
+        }
+        
+        /* FOOTER */
+        footer {
+            margin-top: 80px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 10px;
+            color: #999;
+        }
+        
+        /* PRINT */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .document {
+                box-shadow: none;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="document">
+        <!-- EN-TÊTE -->
+        <header>
+            <div class="cabinet-info">
+                <h1>HAYOT EXPERTISE</h1>
+                <p>Expert-Comptable • Commissaire aux Comptes</p>
+                <p>Cabinet inscrit à l'Ordre des Experts-Comptables</p>
+            </div>
+            <div class="document-meta">
+                <div class="numero">N° LdM : {{numero_ldm}}</div>
+                <p>{{ville}}, le {{date_signature}}</p>
+            </div>
+        </header>
+
+        <!-- TITRE -->
+        <div class="titre">
+            <h2>LETTRE DE MISSION</h2>
+        </div>
+
+        <!-- PARTIES CABINET & CLIENT -->
+        <div class="parties">
+            <div class="partie cabinet">
+                <h3>Le Cabinet</h3>
+                <p><strong>HAYOT EXPERTISE</strong></p>
+                <p><span class="label">Expert-Comptable</span></p>
+                <p><span class="label">Assuré par Verspieren</span></p>
+                <p><span class="label">Délai de couverture : 1 an après résiliation</span></p>
+            </div>
+            <div class="partie client">
+                <h3>Le Client</h3>
+                <p><strong>{{client_nom}}</strong></p>
+                <p><span class="label">{{client_forme_juridique}}</span></p>
+                <p><span class="label">SIRET : {{client_siret}}</span></p>
+                <p><span class="label">{{client_adresse}}</span></p>
+                <p><span class="label">Représenté par {{client_representant}}, {{client_qualite}}</span></p>
+            </div>
+        </div>
+
+        <!-- ARTICLE 1 : OBJET DE LA MISSION -->
+        <section>
+            <div class="section-title">Article 1 — Objet de la Mission</div>
+            <div class="section-content">
+                <p>Le Cabinet est chargé d'une mission de <strong>{{type_mission}}</strong>.</p>
+                <p>Cette mission prend effet à compter du <strong>{{date_debut_mission}}</strong>.</p>
+                
+                <!-- PRÉSENTATION DU CABINET -->
+                <div class="presentation-cabinet">
+                    <h4>Qui sommes-nous ?</h4>
+                    <ul>
+                        <li><strong>Un cabinet humain :</strong> Vos enjeux sont nos enjeux. Nous construisons des relations de confiance durables.</li>
+                        <li><strong>Un cabinet réactif :</strong> Disponibilité et écoute permanente pour répondre à vos besoins spécifiques.</li>
+                        <li><strong>Un cabinet digitalisé :</strong> Intégration complète avec Pennylane pour une comptabilité modernisée et automatisée.</li>
+                        <li><strong>Une expertise reconnue :</strong> Respect des normes professionnelles de l'Ordre des Experts-Comptables et du Code de déontologie.</li>
+                    </ul>
+                </div>
+                
+                <p>La présente mission correspond à une <strong>obligation de moyens et non de résultat</strong>. Elle est réalisée conformément aux normes professionnelles et au Code de déontologie de notre profession.</p>
+            </div>
+        </section>
+
+        <!-- ARTICLE 2 : DURÉE & RÉSILIATION -->
+        <section>
+            <div class="section-title">Article 2 — Durée et Résiliation</div>
+            <div class="section-content">
+                <p>Le présent contrat est conclu pour une durée indéterminée à compter de sa signature. Chacune des parties peut y mettre fin par lettre recommandée avec accusé de réception, sous réserve du respect d'un préavis de <strong>trois (3) mois</strong>, sauf faute grave.</p>
+            </div>
+        </section>
+
+        <!-- ARTICLE 3 : GRILLE TARIFAIRE -->
+        <section>
+            <div class="section-title">Article 3 — Honoraires et Facturation</div>
+            <div class="section-content">
+                <p>Les honoraires ci-dessous sont convenus d'un commun accord. Ils s'entendent <strong>hors TVA</strong> (taux applicable : 20%).</p>
+                
+                <div class="grille-tarifaire">
+                    <h4>Grille Tarifaire Hayot Expertise</h4>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Comptabilité Générale</span>
+                            <span class="tarif-category-value">{{tarif_comptabilite_forfait}} € HT/mois</span>
+                        </div>
+                        <div class="tarif-category-desc">Tenue de la comptabilité, bilan, compte de résultat, annexes</div>
+                    </div>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Conseil & Optimisation</span>
+                            <span class="tarif-category-value">{{tarif_conseil_horaire}} € HT/heure</span>
+                        </div>
+                        <div class="tarif-category-desc">Conseils fiscaux, optimisation structure, stratégie d'entreprise</div>
+                    </div>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Déclaration Fiscale (IR/IS)</span>
+                            <span class="tarif-category-value">{{tarif_fiscal_forfait}} € HT/an</span>
+                        </div>
+                        <div class="tarif-category-desc">Déclarations IR, IS, TVA et liasses fiscales</div>
+                    </div>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Conseils Juridiques</span>
+                            <span class="tarif-category-value">{{tarif_juridique_forfait}} € HT/an</span>
+                        </div>
+                        <div class="tarif-category-desc">Contrats, statuts, restructurations, conseils légaux annuels</div>
+                    </div>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Paie & Social</span>
+                            <span class="tarif-category-value">{{tarif_social_forfait}} € HT/mois</span>
+                        </div>
+                        <div class="tarif-category-desc">Gestion paie, déclarations sociales, conseil RH</div>
+                    </div>
+                    
+                    <div class="tarif-category">
+                        <div class="tarif-category-header">
+                            <span class="tarif-category-name">Suivi Client & Support</span>
+                            <span class="tarif-category-value">{{tarif_suivi_client_mensuel}} € HT/mois</span>
+                        </div>
+                        <div class="tarif-category-desc">Disponibilité, support, reporting mensuel et analyses</div>
+                    </div>
+                </div>
+                
+                <!-- INCLUS VS HORS FORFAIT -->
+                <div class="inclus-hors">
+                    <div class="inclus-hors-box inclus">
+                        <h5>✓ Inclus dans le Forfait</h5>
+                        <ul>
+                            <li>Comptabilité générale complète</li>
+                            <li>Bilan et compte de résultat</li>
+                            <li>Liasse fiscale complète</li>
+                            <li>Déclaration IR/IS annuelle</li>
+                            <li>Conseils fiscaux de base</li>
+                            <li>Support téléphonique/email</li>
+                            <li>Accès portail client Pennylane</li>
+                            <li>Réunions d'avancement trimestrielles</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="inclus-hors-box hors">
+                        <h5>✗ Facturé Hors Forfait</h5>
+                        <ul>
+                            <li>Contrôles fiscaux/sociaux (audit)</li>
+                            <li>Restructurations complexes (fusion, scission)</li>
+                            <li>Contentieux et litiges</li>
+                            <li>Conseil patrimonial haut de gamme</li>
+                            <li>Audit d'acquisition (due diligence)</li>
+                            <li>Déblocage d'assemblée générale annuelle</li>
+                            <li>Expertise judiciaire</li>
+                            <li>Travaux ponctuels hors cadre mission</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ARTICLE 4 : MODALITÉS DE FACTURATION -->
+        <section>
+            <div class="section-title">Article 4 — Facturation et Règlement</div>
+            <div class="section-content">
+                <p><strong>Nos honoraires sont facturés en début de mois</strong> et payables par <strong>prélèvements automatiques</strong>.</p>
+                <p>Les prélèvements automatiques mensuels seront mis en place, et la présente lettre de mission prendra effet à la validation du mandat de prélèvement.</p>
+                <p><strong>Aucun escompte ne sera accordé</strong> en cas de paiement anticipé.</p>
+                
+                <!-- PÉNALITÉS -->
+                <div class="penalites-box">
+                    <h4>Pénalités de Retard</h4>
+                    <p>En cas de retard de paiement, des pénalités seront appliquées : <strong>3 fois le taux d'intérêt légal</strong> + <strong>indemnité forfaitaire de 40 €</strong> par facture impayée, conformément à nos Conditions Générales.</p>
+                </div>
+                
+                <p>Les factures seront envoyées par voie électronique. Tout point de facturation particulier sera signalé à l'avance.</p>
+            </div>
+        </section>
+
+        <!-- ARTICLE 5 : ASSURANCE RESPONSABILITÉ CIVILE -->
+        <section>
+            <div class="section-title">Article 5 — Couverture Assurantielle</div>
+            <div class="section-content">
+                <p>Le Cabinet est assuré en responsabilité civile professionnelle par <strong>Verspieren</strong> pour couvrir l'ensemble de ses interventions.</p>
+                
+                <div class="assurance-box">
+                    <h4>Assurance Responsabilité Civile Professionnelle</h4>
+                    <p><strong>Assureur :</strong> Verspieren</p>
+                    <p><strong>Couverture :</strong> Honoraires d'assistance en cas de contrôle fiscal ou social</p>
+                    <p><strong>Extension optionnelle :</strong> Vous pouvez souscrire une assurance complémentaire permettant de couvrir, en cas de contrôle fiscal ou social, nos honoraires d'assistance ainsi que, le cas échéant, les honoraires d'un avocat lors d'un contentieux.</p>
+                    <p><strong>Délai de couverture :</strong> <strong>1 an après résiliation</strong> de la mission (run-off).</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ARTICLE 6 : RÉVISION DES TARIFS -->
+        <section>
+            <div class="section-title">Article 6 — Révision des Tarifs</div>
+            <div class="section-content">
+                <div class="revision-box">
+                    <h4>Clause de Révision</h4>
+                    <p>Toute révision de tarif sera notifiée par écrit au client avec un préavis de <strong>{{delai_preavis_revision}} jours</strong> avant sa prise d'effet. Le client sera informé des raisons de cette révision.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ARTICLE 7 : CONDITIONS GÉNÉRALES -->
+        <section>
+            <div class="section-title">Article 7 — Conditions Générales</div>
+            <div class="section-content">
+                <p>La présente Lettre de Mission est complétée par nos <strong>Conditions Générales de Vente (CGV)</strong>, annexées au présent document et communiquées au client par écrit. En signant la présente lettre, le client reconnaît avoir lu et accepté ces conditions dans leur intégralité.</p>
+                <p><strong>En cas de contradiction entre la Lettre de Mission et les CGV, la Lettre de Mission prévaut.</strong></p>
+            </div>
+        </section>
+
+        <!-- SIGNATURES -->
+        <section>
+            <div class="section-title" style="margin-bottom: 30px;">Signatures — Bon pour accord</div>
+            <div class="signatures">
+                <div class="signature-block">
+                    <p><strong>Pour le Cabinet HAYOT EXPERTISE</strong></p>
+                    <p class="signature-label">L'Expert-Comptable</p>
+                    <div class="signature-line"></div>
+                    <p class="signature-label">Signature et tampon</p>
+                    <p class="signature-label" style="margin-top: 10px;">Date : ___________________</p>
+                </div>
+                <div class="signature-block">
+                    <p><strong>Pour {{client_nom}}</strong></p>
+                    <p class="signature-label">{{client_representant}}, {{client_qualite}}</p>
+                    <div class="signature-line"></div>
+                    <p class="signature-label">Signature</p>
+                    <p class="signature-label" style="margin-top: 10px;">Date : ___________________</p>
+                    <p class="signature-label" style="margin-top: 5px; color: #999; font-style: italic;">Mention manuscrite : « Lu et approuvé »</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer>
+            <p>© Hayot Expertise — Lettre de Mission — Version 2.0 — Mars 2026</p>
+            <p>Document confidentiel • Propriété du Cabinet Hayot Expertise</p>
+        </footer>
+    </div>
+</body>
+</html>
