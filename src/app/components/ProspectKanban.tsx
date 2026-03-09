@@ -2,12 +2,12 @@
  * ProspectKanban — Vue Pipeline Kanban pour le module Prospection (Chantier 9)
  *
  * Colonnes : Lead à contacter · Email envoyé · En négociation (RDV) · Gagné (Client) · Perdu
- * Drag & Drop via react-dnd (déjà installé).
+ * Drag & Drop via @hello-pangea/dnd (DragDropContext, Droppable, Draggable).
+ * Lead scoring badges : 🔥 Chaud (≥70), 🟡 Tiède (≥40), 🧊 Froid (<40).
  */
 
-import { useRef, useMemo } from 'react';
-import { useDrag, useDrop, DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useMemo } from 'react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import {
   Mail, Phone, Building2, Calendar, Eye, MousePointerClick,
   PhoneCall, Euro, CalendarClock,
@@ -38,6 +38,8 @@ export interface KanbanLead extends Prospect {
   estimatedValue?: number | null;
   /** Date de la prochaine action commerciale */
   nextActionDate?: string | null;
+  /** Lead score 0-100 (🔥 ≥70, 🟡 ≥40, 🧊 <40) */
+  leadScore?: number;
 }
 
 interface ProspectKanbanProps {
@@ -56,133 +58,158 @@ const COLUMNS: Array<{ id: KanbanColumn; label: string; color: string; bg: strin
   { id: 'perdu',         label: 'Perdu',                  color: 'text-red-500',     bg: 'bg-red-50 border-red-200',       icon: '❌' },
 ];
 
-const DRAG_TYPE = 'PROSPECT_CARD';
+// ─── Lead heat badge ──────────────────────────────────────────────────────────
+
+function HeatBadge({ score }: { score?: number }) {
+  if (score == null) return null;
+  if (score >= 70) {
+    return (
+      <span title={`Score : ${score}/100 — Chaud`} className="text-sm leading-none select-none">
+        🔥
+      </span>
+    );
+  }
+  if (score >= 40) {
+    return (
+      <span title={`Score : ${score}/100 — Tiède`} className="text-sm leading-none select-none">
+        🟡
+      </span>
+    );
+  }
+  return (
+    <span title={`Score : ${score}/100 — Froid`} className="text-sm leading-none select-none">
+      🧊
+    </span>
+  );
+}
 
 // ─── Draggable Card ───────────────────────────────────────────────────────────
 
 function ProspectCard({
   lead,
+  index,
   onCardClick,
 }: {
   lead: KanbanLead;
+  index: number;
   onCardClick: (id: string) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const [{ isDragging }, drag] = useDrag({
-    type: DRAG_TYPE,
-    item: { id: lead.id },
-    collect: monitor => ({ isDragging: monitor.isDragging() }),
-  });
-
-  drag(ref);
-
   return (
-    <div
-      ref={ref}
-      onClick={() => onCardClick(lead.id)}
-      className={`group bg-white rounded-lg border border-gray-200 shadow-sm p-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-md hover:border-blue-200 ${
-        isDragging ? 'opacity-40 rotate-2 scale-95' : 'opacity-100'
-      }`}
-    >
-      {/* Company */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-          <p className="text-xs font-semibold text-gray-900 truncate leading-tight">
-            {lead.nomSociete}
-          </p>
-        </div>
-        <span className="text-[10px] font-medium text-gray-400 flex-shrink-0 bg-gray-100 px-1.5 py-0.5 rounded">
-          {lead.formeJuridique}
-        </span>
-      </div>
+    <Draggable draggableId={lead.id} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          onClick={() => onCardClick(lead.id)}
+          className={`group bg-white rounded-lg border border-gray-200 shadow-sm p-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-md hover:border-blue-200 ${
+            snapshot.isDragging ? 'opacity-80 shadow-lg rotate-1 scale-105 ring-2 ring-blue-300' : 'opacity-100'
+          }`}
+          style={provided.draggableProps.style}
+        >
+          {/* Company + heat badge */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <p className="text-xs font-semibold text-gray-900 truncate leading-tight">
+                {lead.nomSociete}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <HeatBadge score={lead.leadScore} />
+              <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                {lead.formeJuridique}
+              </span>
+            </div>
+          </div>
 
-      {/* Manager */}
-      {lead.dirigeantPrincipal && (
-        <p className="text-[11px] text-gray-500 mb-2 flex items-center gap-1">
-          <span className="w-4 h-4 bg-blue-100 rounded-full inline-flex items-center justify-center text-blue-600 font-semibold text-[8px] flex-shrink-0">
-            {((lead.dirigeantPrincipal.prenom?.[0] ?? '') + (lead.dirigeantPrincipal.nom?.[0] ?? '')).toUpperCase()}
-          </span>
-          <span className="truncate">
-            {lead.dirigeantPrincipal.prenom} {lead.dirigeantPrincipal.nom}
-          </span>
-        </p>
-      )}
-
-      {/* Contact info */}
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        {lead.email && (
-          <span className="flex items-center gap-0.5 text-[10px] text-blue-500">
-            <Mail className="w-2.5 h-2.5" /> Email
-          </span>
-        )}
-        {lead.telephone && (
-          <span className="flex items-center gap-0.5 text-[10px] text-green-500">
-            <Phone className="w-2.5 h-2.5" /> Tél
-          </span>
-        )}
-        {lead.callLogs.length > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] text-purple-500">
-            <PhoneCall className="w-2.5 h-2.5" /> {lead.callLogs.length} appel{lead.callLogs.length > 1 ? 's' : ''}
-          </span>
-        )}
-      </div>
-
-      {/* Tracking badges */}
-      {lead.emailSentAt && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {lead.openCount > 0 ? (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <Eye className="w-2.5 h-2.5" /> Ouvert ({lead.openCount}×)
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400">
-              Non ouvert
-            </span>
+          {/* Manager */}
+          {lead.dirigeantPrincipal && (
+            <p className="text-[11px] text-gray-500 mb-2 flex items-center gap-1">
+              <span className="w-4 h-4 bg-blue-100 rounded-full inline-flex items-center justify-center text-blue-600 font-semibold text-[8px] flex-shrink-0">
+                {((lead.dirigeantPrincipal.prenom?.[0] ?? '') + (lead.dirigeantPrincipal.nom?.[0] ?? '')).toUpperCase()}
+              </span>
+              <span className="truncate">
+                {lead.dirigeantPrincipal.prenom} {lead.dirigeantPrincipal.nom}
+              </span>
+            </p>
           )}
-          {lead.clicked && (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-              <MousePointerClick className="w-2.5 h-2.5" /> Cliqué
-            </span>
+
+          {/* Contact info */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {lead.email && (
+              <span className="flex items-center gap-0.5 text-[10px] text-blue-500">
+                <Mail className="w-2.5 h-2.5" /> Email
+              </span>
+            )}
+            {lead.telephone && (
+              <span className="flex items-center gap-0.5 text-[10px] text-green-500">
+                <Phone className="w-2.5 h-2.5" /> Tél
+              </span>
+            )}
+            {lead.callLogs.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-purple-500">
+                <PhoneCall className="w-2.5 h-2.5" /> {lead.callLogs.length} appel{lead.callLogs.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Tracking badges */}
+          {lead.emailSentAt && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {lead.openCount > 0 ? (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Eye className="w-2.5 h-2.5" /> Ouvert ({lead.openCount}×)
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-400">
+                  Non ouvert
+                </span>
+              )}
+              {lead.clicked && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  <MousePointerClick className="w-2.5 h-2.5" /> Cliqué
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Sequence step */}
+          {lead.sequenceStep > 0 && (
+            <div className="flex items-center gap-1 text-[10px] text-amber-600">
+              <Calendar className="w-2.5 h-2.5" />
+              {lead.sequenceStep === 1 ? 'Relance 1' : 'Relance 2'} planifiée
+              {lead.nextFollowUpDate && ` — ${new Date(lead.nextFollowUpDate).toLocaleDateString('fr-FR')}`}
+            </div>
+          )}
+
+          {/* CRM metrics: estimated value + next action date */}
+          {(lead.estimatedValue != null || lead.nextActionDate) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-gray-100">
+              {lead.estimatedValue != null && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Euro className="w-2.5 h-2.5" />
+                  {lead.estimatedValue.toLocaleString('fr-FR')} €
+                </span>
+              )}
+              {lead.nextActionDate && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                  <CalendarClock className="w-2.5 h-2.5" />
+                  {new Date(lead.nextActionDate).toLocaleDateString('fr-FR')}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Icebreaker */}
+          {lead.icebreakerIa && (
+            <p className="text-[10px] text-violet-600 italic mt-1.5 line-clamp-2 border-t border-violet-100 pt-1.5">
+              ✨ {lead.icebreakerIa}
+            </p>
           )}
         </div>
       )}
-
-      {/* Sequence step */}
-      {lead.sequenceStep > 0 && (
-        <div className="flex items-center gap-1 text-[10px] text-amber-600">
-          <Calendar className="w-2.5 h-2.5" />
-          {lead.sequenceStep === 1 ? 'Relance 1' : 'Relance 2'} planifiée
-          {lead.nextFollowUpDate && ` — ${new Date(lead.nextFollowUpDate).toLocaleDateString('fr-FR')}`}
-        </div>
-      )}
-
-      {/* CRM metrics: estimated value + next action date */}
-      {(lead.estimatedValue != null || lead.nextActionDate) && (
-        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-gray-100">
-          {lead.estimatedValue != null && (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <Euro className="w-2.5 h-2.5" />
-              {lead.estimatedValue.toLocaleString('fr-FR')} €
-            </span>
-          )}
-          {lead.nextActionDate && (
-            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-              <CalendarClock className="w-2.5 h-2.5" />
-              {new Date(lead.nextActionDate).toLocaleDateString('fr-FR')}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Icebreaker */}
-      {lead.icebreakerIa && (
-        <p className="text-[10px] text-violet-600 italic mt-1.5 line-clamp-2 border-t border-violet-100 pt-1.5">
-          ✨ {lead.icebreakerIa}
-        </p>
-      )}
-    </div>
+    </Draggable>
   );
 }
 
@@ -191,33 +218,14 @@ function ProspectCard({
 function KanbanColumnArea({
   column,
   leads,
-  onDrop,
   onCardClick,
 }: {
   column: typeof COLUMNS[number];
   leads: KanbanLead[];
-  onDrop: (id: string, columnId: KanbanColumn) => void;
   onCardClick: (id: string) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  const [{ isOver }, drop] = useDrop<{ id: string }, void, { isOver: boolean }>({
-    accept: DRAG_TYPE,
-    drop: item => onDrop(item.id, column.id),
-    collect: monitor => ({ isOver: monitor.isOver() }),
-  });
-
-  drop(ref);
-
   return (
-    <div
-      ref={ref}
-      className={`flex flex-col rounded-xl border-2 transition-all min-w-[220px] max-w-[280px] flex-1 ${
-        isOver
-          ? 'border-blue-400 bg-blue-50/50 shadow-md'
-          : `${column.bg} border-transparent`
-      }`}
-    >
+    <div className={`flex flex-col rounded-xl border-2 transition-all min-w-[220px] max-w-[280px] flex-1 ${column.bg} border-transparent`}>
       {/* Column header */}
       <div className="px-3 py-3 border-b border-white/60">
         <div className="flex items-center justify-between">
@@ -231,17 +239,28 @@ function KanbanColumnArea({
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
-        {leads.length === 0 && (
-          <div className={`flex items-center justify-center h-16 text-xs ${column.color} opacity-40 italic`}>
-            Glissez une carte ici
+      {/* Cards — droppable zone */}
+      <Droppable droppableId={column.id}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px] rounded-b-xl transition-colors ${
+              snapshot.isDraggingOver ? 'bg-blue-50/70 ring-2 ring-inset ring-blue-300' : ''
+            }`}
+          >
+            {leads.length === 0 && !snapshot.isDraggingOver && (
+              <div className={`flex items-center justify-center h-16 text-xs ${column.color} opacity-40 italic`}>
+                Glissez une carte ici
+              </div>
+            )}
+            {leads.map((lead, index) => (
+              <ProspectCard key={lead.id} lead={lead} index={index} onCardClick={onCardClick} />
+            ))}
+            {provided.placeholder}
           </div>
         )}
-        {leads.map(lead => (
-          <ProspectCard key={lead.id} lead={lead} onCardClick={onCardClick} />
-        ))}
-      </div>
+      </Droppable>
     </div>
   );
 }
@@ -260,8 +279,17 @@ export function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanba
     return grouped;
   }, [leads]);
 
+  function handleDragEnd(result: DropResult) {
+    const { destination, draggableId } = result;
+    if (!destination) return;
+    const targetColumn = destination.droppableId as KanbanColumn;
+    const lead = leads.find(l => l.id === draggableId);
+    if (!lead || lead.kanbanColumn === targetColumn) return;
+    onMoveCard(draggableId, targetColumn);
+  }
+
   return (
-    <DndProvider backend={HTML5Backend}>
+    <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex gap-3 h-full overflow-x-auto p-4">
         {COLUMNS.map(col => {
           const colLeads = leadsByColumn.get(col.id) || [];
@@ -270,13 +298,12 @@ export function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanba
               key={col.id}
               column={col}
               leads={colLeads}
-              onDrop={onMoveCard}
               onCardClick={onCardClick}
             />
           );
         })}
       </div>
-    </DndProvider>
+    </DragDropContext>
   );
 }
 
