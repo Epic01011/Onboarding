@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Trophy, CheckCircle2, Mail, Calendar, Phone, Star, ExternalLink, Eye } from 'lucide-react';
+import { useParams } from 'react-router';
+import { Trophy, CheckCircle2, Mail, Calendar, Phone, Star, ExternalLink, Eye, UserCheck } from 'lucide-react';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { StepShell } from '../StepShell';
 import { sendEmail, buildWelcomeEmail } from '../../services/emailService';
@@ -7,8 +8,11 @@ import { useCabinet } from '../../context/CabinetContext';
 import { useServices } from '../../context/ServicesContext';
 import { EmailPreviewEditModal } from '../modals/EmailPreviewEditModal';
 import { toast } from 'sonner';
+import { useOnboardingDraftStore } from '../../store/useOnboardingDraftStore';
+import { useProspectStore } from '../../store/useProspectStore';
 
 export function Step11() {
+  const { dossierId } = useParams<{ dossierId: string }>();
   const { clientData, updateClientData, goPrev } = useOnboarding();
   const [emailSent, setEmailSent] = useState(clientData.welcomeEmailSent);
   const [tasksScheduled, setTasksScheduled] = useState(false);
@@ -16,10 +20,16 @@ export function Step11() {
   const [emailDemo, setEmailDemo] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [sending, setSending] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [converted, setConverted] = useState(false);
 
   const { cabinet } = useCabinet();
   const { getEmailConfig } = useServices();
   const emailConfig = getEmailConfig();
+
+  const { getDraft, clearDraft } = useOnboardingDraftStore();
+  const { convertProspectToClient } = useProspectStore();
+  const prospectId = dossierId ? (getDraft(dossierId)?.prospectId ?? null) : null;
 
   useEffect(() => {
     setShowConfetti(true);
@@ -69,6 +79,23 @@ export function Step11() {
   };
 
   const allDone = emailSent && tasksScheduled;
+
+  const handleConvertToClient = async () => {
+    if (!prospectId) {
+      toast.info('Aucun prospect associé à ce dossier. Conversion ignorée.');
+      return;
+    }
+    setConverting(true);
+    const result = await convertProspectToClient(prospectId);
+    setConverting(false);
+    if (result.success) {
+      setConverted(true);
+      if (dossierId) clearDraft(dossierId);
+      toast.success('Prospect converti en Client avec succès ✓');
+    } else {
+      toast.error(`Erreur lors de la conversion. ${result.error}`);
+    }
+  };
 
   const confettiColors = ['#fbbf24', '#34d399', '#60a5fa', '#f87171', '#a78bfa', '#fb923c', '#ec4899'];
 
@@ -279,6 +306,29 @@ export function Step11() {
             <p>✓ Suivi J+7 / J+30 programmé</p>
             {clientData.missionType === 'reprise' && <p>✓ Lettre confraternelle envoyée</p>}
             <p>✓ Email de bienvenue envoyé</p>
+          </div>
+
+          {/* Prospect → Client conversion */}
+          <div className="border-t border-emerald-200 pt-3 mb-3">
+            {converted ? (
+              <div className="flex items-center gap-2 text-emerald-700 text-sm">
+                <UserCheck className="w-4 h-4" />
+                <span className="font-medium">Prospect converti en Client ✓</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleConvertToClient}
+                disabled={converting}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {converting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <UserCheck className="w-4 h-4" />
+                )}
+                {converting ? 'Conversion en cours…' : 'Finaliser — Convertir en Client'}
+              </button>
+            )}
           </div>
 
           {/* Quick access links */}
