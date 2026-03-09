@@ -31,6 +31,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 /** Timeout for upstream AI API calls (ms). Must be < Vercel's 30 s limit. */
 const UPSTREAM_TIMEOUT_MS = 25_000;
 
+/** Optional client context for RAG-enriched generation (last emails, devis status). */
+interface ClientContext {
+  lastEmails?: string[];
+  devisStatus?: string;
+  clientName?: string;
+}
+
 interface GenerateEmailBody {
   provider: 'claude' | 'openai' | 'perplexity';
   apiKey: string;
@@ -38,6 +45,10 @@ interface GenerateEmailBody {
   userPrompt: string;
   model?: string;
   maxTokens?: number;
+  /** Pre-instruction text prepended to the system prompt (from cabinet configuration). */
+  preInstruction?: string;
+  /** RAG context: client data fetched from the database before generation. */
+  clientContext?: ClientContext;
 }
 
 // ─── Upstream timeout helper ─────────────────────────────────────────────────
@@ -227,7 +238,7 @@ export default async function handler(
     return;
   }
 
-  const { provider, apiKey, systemPrompt, userPrompt, model, maxTokens } = (req.body ?? {}) as Partial<GenerateEmailBody>;
+  const { provider, apiKey, systemPrompt, userPrompt, model, maxTokens, preInstruction, clientContext } = (req.body ?? {}) as Partial<GenerateEmailBody>;
 
   if (!provider || !apiKey || !systemPrompt || !userPrompt) {
     res.status(400).json({ error: 'Missing required fields: provider, apiKey, systemPrompt, userPrompt' });
@@ -241,14 +252,45 @@ export default async function handler(
 
   const tokens = maxTokens ?? 2048;
 
+  // ── Build enriched system prompt ──────────────────────────────────────────
+  // 1. Optional pre-instruction from cabinet settings (per email type).
+  // 2. Core system prompt passed by the client.
+  const enrichedSystemParts: string[] = [];
+  if (preInstruction?.trim()) {
+    enrichedSystemParts.push(preInstruction.trim());
+  }
+  enrichedSystemParts.push(systemPrompt);
+  const enrichedSystem = enrichedSystemParts.join('\n\n');
+
+  // ── Build enriched user prompt (RAG context) ──────────────────────────────
+  // Prepend available client context before the main user prompt so the model
+  // can personalise its response based on history / dossier state.
+  const contextLines: string[] = [];
+  if (clientContext) {
+    if (clientContext.clientName) {
+      contextLines.push(`Client : ${clientContext.clientName}`);
+    }
+    if (clientContext.devisStatus) {
+      contextLines.push(`Statut du devis : ${clientContext.devisStatus}`);
+    }
+    if (clientContext.lastEmails?.length) {
+      contextLines.push('Derniers échanges (résumés) :');
+      clientContext.lastEmails.forEach((e, i) => {
+        contextLines.push(`  ${i + 1}. ${e}`);
+      });
+    }
+  }
+  const enrichedUser =
+    contextLines.length > 0
+      ? `[Contexte client]\n${contextLines.join('\n')}\n\n[Demande]\n${userPrompt}`
+      : userPrompt;
+
   try {
     let content: string;
     if (provider === 'claude') {
-      content = await callClaude(apiKey, systemPrompt, userPrompt, model ?? 'claude-3-5-sonnet-20241022', tokens);
-    } else if (provider === 'perplexity') {
-      content = await callPerplexity(apiKey, systemPrompt, userPrompt, model ?? 'sonar-pro', tokens);
+      content = await callClaude(apiKey, enrichedSystem, enrichedUser, model ?? 'claude-3-5-sonnet-20241022', tokens);
     } else {
-      content = await callOpenAI(apiKey, systemPrompt, userPrompt, model ?? 'gpt-4o-mini', tokens);
+      content = await callOpenAI(apiKey, enrichedSystem, enrichedUser, model ?? 'gpt-4o-mini', tokens);
     }
     res.status(200).json({ content });
   } catch (err: unknown) {
