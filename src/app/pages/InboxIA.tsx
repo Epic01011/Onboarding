@@ -1,17 +1,28 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Mail, CheckCircle2, XCircle, Edit3, RefreshCw, Clock, ArrowLeft, Send,
   Wifi, WifiOff, InboxIcon, MailCheck, BookOpen, Copy, Printer, ExternalLink,
+  AlertTriangle, Frown, FileText, Settings, X, Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEmailDraftStore } from '../../components/ai-assistant/useEmailDraftStore';
-import { AIEmailDraft } from '../../components/ai-assistant/types';
+import { AIEmailDraft, SentimentTag, SystemPromptConfig } from '../../components/ai-assistant/types';
 import { useMicrosoftAuth } from '../context/MicrosoftAuthContext';
 import { useInboxSync } from '../hooks/useInboxSync';
 import DOMPurify from 'dompurify';
 
 type ActiveTab = 'drafts' | 'sent';
+
+// ─── System prompt defaults ────────────────────────────────────────────────────
+
+const DEFAULT_SYSTEM_PROMPTS: SystemPromptConfig = {
+  fiscal: "Tu es un expert-comptable fiscaliste. Rédige des réponses précises, professionnelles et fondées sur le droit fiscal français (CGI, BOFiP). Cite les articles applicables.",
+  social: "Tu es un expert-comptable spécialisé en droit social. Rédige des réponses claires sur les cotisations, contrats et obligations sociales, en référençant le Code du travail et l'URSSAF.",
+  relance: "Tu es un expert-comptable rédacteur de relances professionnelles. Formule des relances courtois mais fermes, adaptées au contexte (factures impayées, documents manquants, délais).",
+};
+
+const LOCAL_STORAGE_PROMPTS_KEY = 'inbox_ia_system_prompts';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 
@@ -24,6 +35,7 @@ function buildDemoDrafts(): AIEmailDraft[] {
       id: 'demo1',
       status: 'pending_review',
       clientName: 'SARL Dupont & Fils',
+      sentimentTags: ['document_request'],
       original_email: {
         from: 'martin.dupont@dupont-conseil.fr',
         to: 'cabinet@cabinetflow.fr',
@@ -48,6 +60,7 @@ function buildDemoDrafts(): AIEmailDraft[] {
       id: 'demo2',
       status: 'pending_review',
       clientName: 'SAS Technova',
+      sentimentTags: ['urgent'],
       original_email: {
         from: 'contact@technova.fr',
         to: 'cabinet@cabinetflow.fr',
@@ -71,11 +84,12 @@ function buildDemoDrafts(): AIEmailDraft[] {
       id: 'demo3',
       status: 'approved',
       clientName: 'EURL Martin Conseil',
+      sentimentTags: ['unhappy'],
       original_email: {
         from: 'contact@martin-conseil.fr',
         to: 'cabinet@cabinetflow.fr',
         subject: 'Cotisations TNS 2026',
-        body: 'Pouvez-vous me donner une estimation de mes cotisations TNS pour 2026 ?',
+        body: 'Pouvez-vous me donner une estimation de mes cotisations TNS pour 2026 ? Je suis très mécontent de ne pas avoir eu de réponse depuis 2 semaines.',
         date: h(-3),
       },
       draft: {
@@ -113,6 +127,48 @@ function buildDemoDrafts(): AIEmailDraft[] {
       updatedAt: h(-25),
     },
   ];
+}
+
+// ─── Sentiment analysis ────────────────────────────────────────────────────────
+
+/**
+ * Analyse the body and subject of an email to detect sentiment signals.
+ * Returns an array of detected SentimentTag values.
+ */
+export function analyzeSentiment(subject: string, body: string): SentimentTag[] {
+  const text = `${subject} ${body}`.toLowerCase();
+  const tags = new Set<SentimentTag>();
+
+  // Urgency signals
+  const urgentKeywords = [
+    'urgent', 'immédiatement', 'immédiat', 'asap', 'dès que possible',
+    'délai', 'délais', 'date limite', 'échéance', 'rapidement', 'au plus vite',
+  ];
+  if (urgentKeywords.some(kw => text.includes(kw))) {
+    tags.add('urgent');
+  }
+
+  // Unhappy / dissatisfied signals
+  const unhappyKeywords = [
+    'mécontent', 'insatisfait', 'déçu', 'déception', 'inacceptable',
+    'scandaleux', 'honteux', 'inadmissible', 'pas normal', 'aucune réponse',
+    'toujours pas', 'encore une fois', 'relance', 'sans réponse', 'inexcusable',
+  ];
+  if (unhappyKeywords.some(kw => text.includes(kw))) {
+    tags.add('unhappy');
+  }
+
+  // Document request signals
+  const docKeywords = [
+    'document', 'documents', 'pièce', 'pièces', 'justificatif', 'justificatifs',
+    'envoyer', 'transmettre', 'fournir', 'attestation', 'relevé', 'relevés',
+    'facture', 'bilan', 'liasse', 'déclaration', 'formulaire', 'bulletin',
+  ];
+  if (docKeywords.some(kw => text.includes(kw))) {
+    tags.add('document_request');
+  }
+
+  return Array.from(tags);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,6 +224,124 @@ function StatusBadge({ status }: { status: AIEmailDraft['status'] }) {
   );
 }
 
+// ─── Sentiment badge ──────────────────────────────────────────────────────────
+
+function SentimentBadge({ tag }: { tag: SentimentTag }) {
+  if (tag === 'urgent') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+        <AlertTriangle className="w-3 h-3" /> Urgent
+      </span>
+    );
+  }
+  if (tag === 'unhappy') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+        <Frown className="w-3 h-3" /> Mécontent
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+      <FileText className="w-3 h-3" /> Demande de document
+    </span>
+  );
+}
+
+function SentimentBadges({ tags }: { tags?: SentimentTag[] }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {tags.map(tag => <SentimentBadge key={tag} tag={tag} />)}
+    </div>
+  );
+}
+
+// ─── System prompt panel ──────────────────────────────────────────────────────
+
+function SystemPromptPanel({
+  config,
+  onSave,
+  onClose,
+}: {
+  config: SystemPromptConfig;
+  onSave: (cfg: SystemPromptConfig) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<SystemPromptConfig>({ ...config });
+
+  const handleSave = () => {
+    onSave(draft);
+    toast.success('Pré-instructions sauvegardées.');
+    onClose();
+  };
+
+  const categories: { key: keyof SystemPromptConfig; label: string; labelClass: string; borderClass: string; ringClass: string; bgClass: string }[] = [
+    { key: 'fiscal', label: 'Fiscale', labelClass: 'text-blue-700', borderClass: 'border-blue-200', ringClass: 'focus:ring-blue-300', bgClass: 'bg-blue-50/30' },
+    { key: 'social', label: 'Sociale', labelClass: 'text-green-700', borderClass: 'border-green-200', ringClass: 'focus:ring-green-300', bgClass: 'bg-green-50/30' },
+    { key: 'relance', label: 'Relance', labelClass: 'text-amber-700', borderClass: 'border-amber-200', ringClass: 'focus:ring-amber-300', bgClass: 'bg-amber-50/30' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-gray-600" />
+            <h2 className="text-base font-semibold text-gray-900">Pré-instructions IA par type d'email</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          <p className="text-xs text-gray-500">
+            Ces instructions sont ajoutées en tête du prompt système lors de la génération IA.
+            Personnalisez-les selon les pratiques de votre cabinet.
+          </p>
+          {categories.map(({ key, label, labelClass, borderClass, ringClass, bgClass }) => (
+            <div key={key}>
+              <label className={`block text-xs font-semibold mb-1.5 ${labelClass}`}>
+                Emails — {label}
+              </label>
+              <textarea
+                rows={4}
+                value={draft[key]}
+                onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))}
+                className={`w-full p-3 text-sm border ${borderClass} rounded-xl focus:outline-none focus:ring-2 ${ringClass} resize-none ${bgClass} font-mono`}
+                placeholder={`Instruction pour les emails de type "${label}"…`}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Sauvegarder
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Draft list item ─────────────────────────────────────────────────────────
 
 function DraftListItem({
@@ -190,6 +364,7 @@ function DraftListItem({
       </div>
       <p className="text-xs text-gray-600 truncate">{draft.original_email.subject ?? '(Sans objet)'}</p>
       <p className="text-xs text-gray-400 mt-0.5">{formatDateShort(draft.original_email.date)}</p>
+      <SentimentBadges tags={draft.sentimentTags} />
     </button>
   );
 }
@@ -260,15 +435,48 @@ function DraftDetail({
     setEditMode(false);
   };
 
+  const handleQuickAction = (action: 'mark_urgent' | 'request_document') => {
+    if (action === 'mark_urgent') {
+      toast('Email marqué comme Urgent.', { icon: '🔴' });
+    } else {
+      toast('Demande de document générée.', { icon: '📄' });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">{draft.original_email.subject ?? '(Sans objet)'}</h2>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900 truncate">{draft.original_email.subject ?? '(Sans objet)'}</h2>
             <p className="text-sm text-gray-500 mt-0.5">{draft.clientName}</p>
+            {draft.sentimentTags && draft.sentimentTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {draft.sentimentTags.map(tag => <SentimentBadge key={tag} tag={tag} />)}
+              </div>
+            )}
           </div>
-          <StatusBadge status={draft.status} />
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <StatusBadge status={draft.status} />
+            {isPending && (
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => handleQuickAction('mark_urgent')}
+                  title="Marquer comme urgent"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <AlertTriangle className="w-3 h-3" /> Urgent
+                </button>
+                <button
+                  onClick={() => handleQuickAction('request_document')}
+                  title="Générer une demande de document"
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                >
+                  <FileText className="w-3 h-3" /> Demande doc
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -619,6 +827,26 @@ export function InboxIA() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('drafts');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showPromptPanel, setShowPromptPanel] = useState(false);
+
+  // System prompt configuration — persisted in localStorage
+  const [systemPrompts, setSystemPrompts] = useState<SystemPromptConfig>(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_PROMPTS_KEY);
+      return stored ? (JSON.parse(stored) as SystemPromptConfig) : DEFAULT_SYSTEM_PROMPTS;
+    } catch {
+      return DEFAULT_SYSTEM_PROMPTS;
+    }
+  });
+
+  const handleSaveSystemPrompts = useCallback((cfg: SystemPromptConfig) => {
+    setSystemPrompts(cfg);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_PROMPTS_KEY, JSON.stringify(cfg));
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   const displayDrafts = useMemo(
     () => (drafts.length > 0 ? drafts : buildDemoDrafts()),
@@ -673,6 +901,15 @@ export function InboxIA() {
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-white">
+      {/* System prompt configuration panel (modal) */}
+      {showPromptPanel && (
+        <SystemPromptPanel
+          config={systemPrompts}
+          onSave={handleSaveSystemPrompts}
+          onClose={() => setShowPromptPanel(false)}
+        />
+      )}
+
       {/* Back navigation */}
       <div className="px-4 py-3 border-b border-gray-100">
         <button
@@ -703,6 +940,13 @@ export function InboxIA() {
                   <WifiOff className="w-3.5 h-3.5 text-gray-400" />
                 </span>
               )}
+              <button
+                onClick={() => setShowPromptPanel(true)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Configurer les pré-instructions IA"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading || !graphToken}

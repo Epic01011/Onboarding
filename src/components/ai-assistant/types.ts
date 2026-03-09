@@ -1,5 +1,15 @@
 export type EmailDraftStatus = 'pending_review' | 'approved' | 'rejected' | 'sent';
 
+/** Sentiment tags automatically applied to an incoming email. */
+export type SentimentTag = 'urgent' | 'unhappy' | 'document_request';
+
+/** Pre-instruction (system prompt) text per email category. */
+export interface SystemPromptConfig {
+  fiscal: string;
+  social: string;
+  relance: string;
+}
+
 export interface BofipSource {
   title: string;
   reference: string;
@@ -21,6 +31,13 @@ export interface DraftContent {
   generatedAt: string;
 }
 
+/** Optional client context used for RAG-enriched AI generation. */
+export interface ClientContext {
+  lastEmails?: string[];
+  devisStatus?: string;
+  clientName?: string;
+}
+
 export interface AIEmailDraft {
   id: string;
   status: EmailDraftStatus;
@@ -29,6 +46,7 @@ export interface AIEmailDraft {
   original_email: OriginalEmail;
   draft: DraftContent;
   bofip_sources_cited: BofipSource[];
+  sentimentTags?: SentimentTag[];
   createdAt: string;
   updatedAt: string;
 }
