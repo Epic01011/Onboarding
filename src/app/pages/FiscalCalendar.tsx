@@ -1,166 +1,291 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Calendar, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+  RefreshCw,
+  ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  ChevronRight,
+  X,
+  RefreshCcw,
+  CloudOff,
+  CloudLightning,
+  Cloud,
+} from 'lucide-react';
 import { useDashboardStore } from '../store/useDashboardStore';
-import { FiscalTask, FiscalTaskStatus } from '../types/dashboard';
+import { FiscalTask, FiscalTaskStatus, FiscalTaskType, SyncStatus } from '../types/dashboard';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { Badge } from '../components/ui/badge';
+import { useFiscalAlerts } from '../hooks/useFiscalAlerts';
 
-// ─── Column config ────────────────────────────────────────────────────────────
+// ─── Task-type columns ────────────────────────────────────────────────────────
 
-interface KanbanColumn {
-  id: FiscalTaskStatus;
-  label: string;
-  emptyLabel: string;
-}
-
-const COLUMNS: KanbanColumn[] = [
-  { id: 'preparation',  label: 'À préparer',              emptyLabel: 'Aucune tâche à préparer' },
-  { id: 'waiting_docs', label: 'En attente de documents', emptyLabel: 'Aucune tâche en attente' },
-  { id: 'ready',        label: 'Prêt pour envoi',         emptyLabel: 'Aucune tâche prête' },
-  { id: 'declared',     label: 'Déclaré',                  emptyLabel: 'Aucune tâche déclarée' },
+const TASK_TYPES: FiscalTaskType[] = [
+  'TVA_CA3',
+  'TVA_CA12',
+  'IS_Solde',
+  'IS_Acompte',
+  'CVAE',
+  'CFE',
+  'DSN',
+  'LIASSE_FISCALE',
+  'BILAN',
+  'DAS2',
+  'PAIE',
 ];
 
-const URGENCY_BORDER: Record<FiscalTask['urgency_semantic'], string> = {
-  green:  'border-l-4 border-green-500',
-  orange: 'border-l-4 border-orange-500',
-  red:    'border-l-4 border-red-500',
+const TASK_TYPE_LABELS: Record<FiscalTaskType, string> = {
+  TVA_CA3:        'TVA CA3',
+  TVA_CA12:       'TVA CA12',
+  IS_Solde:       'IS Solde',
+  IS_Acompte:     'IS Acompte',
+  CVAE:           'CVAE',
+  CFE:            'CFE',
+  DSN:            'DSN',
+  LIASSE_FISCALE: 'Liasse',
+  BILAN:          'Bilan',
+  DAS2:           'DAS2',
+  PAIE:           'Paie',
+  OTHER:          'Autre',
 };
 
-const URGENCY_DOT: Record<FiscalTask['urgency_semantic'], string> = {
-  green:  'bg-green-400',
-  orange: 'bg-orange-400',
-  red:    'bg-red-400',
+// ─── Status config ────────────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<FiscalTaskStatus, { label: string; short: string }> = {
+  preparation:  { label: 'À préparer',   short: 'Prép.' },
+  waiting_docs: { label: 'Attente docs', short: 'Docs'  },
+  ready:        { label: 'Prêt',         short: 'Prêt'  },
+  declared:     { label: 'Déclaré',      short: '✓'     },
 };
 
-const TASK_TYPE_LABELS: Record<string, string> = {
-  TVA_CA3:       'TVA CA3',
-  TVA_CA12:      'TVA CA12',
-  IS_Solde:      'IS Solde',
-  IS_Acompte:    'IS Acompte',
-  CVAE:          'CVAE',
-  CFE:           'CFE',
-  DSN:           'DSN',
-  LIASSE_FISCALE:'Liasse fiscale',
-  BILAN:         'Bilan',
-  DAS2:          'DAS2',
-  PAIE:          'Paie',
-  OTHER:         'Autre',
+const STATUS_NEXT: Partial<Record<FiscalTaskStatus, FiscalTaskStatus>> = {
+  preparation:  'waiting_docs',
+  waiting_docs: 'ready',
+  ready:        'declared',
 };
 
-// ─── Demo data (shown when store is empty / n8n not configured) ───────────────
+// ─── Urgency helpers ──────────────────────────────────────────────────────────
+
+function daysLeft(dueDateIso: string): number {
+  return Math.ceil((new Date(dueDateIso).getTime() - Date.now()) / 86_400_000);
+}
+
+/** Consistent countdown label used in both the alert banner and matrix cells. */
+function formatDaysLeft(dl: number): string {
+  if (dl > 0)  return `J-${dl}`;
+  if (dl === 0) return 'Auj.';
+  return `J+${Math.abs(dl)}`;
+}
+
+function cellBg(task: FiscalTask): string {
+  if (task.status === 'declared') return 'bg-gray-50';
+  const d = daysLeft(task.due_date);
+  if (d <= 7)  return 'bg-red-50';
+  if (d <= 21) return 'bg-amber-50';
+  return 'bg-emerald-50';
+}
+
+function badgeClasses(task: FiscalTask): string {
+  if (task.status === 'declared')
+    return 'border border-gray-200 bg-white text-gray-500';
+  const d = daysLeft(task.due_date);
+  if (d <= 7)  return 'border border-red-200 bg-red-100 text-red-800';
+  if (d <= 21) return 'border border-amber-200 bg-amber-100 text-amber-800';
+  return 'border border-emerald-200 bg-emerald-100 text-emerald-800';
+}
+
+// ─── Sync icon ────────────────────────────────────────────────────────────────
+
+const SYNC_ICONS: Record<SyncStatus, React.ReactNode> = {
+  synced:       <Cloud         className="w-2.5 h-2.5 text-blue-400"  aria-label="Synchronisé" />,
+  pending_push: <CloudLightning className="w-2.5 h-2.5 text-amber-400" aria-label="En attente d'envoi" />,
+  pending_pull: <RefreshCcw   className="w-2.5 h-2.5 text-amber-400"  aria-label="En attente de réception" />,
+  conflict:     <CloudOff     className="w-2.5 h-2.5 text-red-500"    aria-label="Conflit de synchronisation" />,
+  error:        <CloudOff     className="w-2.5 h-2.5 text-red-500"    aria-label="Erreur de synchronisation" />,
+};
+
+// ─── Demo data ────────────────────────────────────────────────────────────────
 
 function buildDemoTasks(): FiscalTask[] {
   const now = new Date();
-  const d = (offset: number) => new Date(now.getTime() + offset * 86_400_000).toISOString();
+  const d = (offset: number) =>
+    new Date(now.getTime() + offset * 86_400_000).toISOString();
+  const iso = now.toISOString();
 
   return [
-    { id: 'd1', client_id: 'c1', client_name: 'SARL Dupont & Fils',  task_type: 'TVA_CA3',        due_date: d(5),   status: 'preparation',  urgency_semantic: 'red',    updated_at: now.toISOString() },
-    { id: 'd2', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'IS_Acompte',    due_date: d(14),  status: 'waiting_docs', urgency_semantic: 'orange', updated_at: now.toISOString() },
-    { id: 'd3', client_id: 'c3', client_name: 'EURL Martin Conseil',  task_type: 'DSN',            due_date: d(14),  status: 'waiting_docs', urgency_semantic: 'orange', updated_at: now.toISOString() },
-    { id: 'd4', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'LIASSE_FISCALE', due_date: d(30),  status: 'ready',        urgency_semantic: 'green',  updated_at: now.toISOString() },
-    { id: 'd5', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'TVA_CA3',        due_date: d(60),  status: 'declared',     urgency_semantic: 'green',  updated_at: now.toISOString() },
-    { id: 'd6', client_id: 'c1', client_name: 'SARL Dupont & Fils',  task_type: 'CFE',             due_date: d(5),   status: 'preparation',  urgency_semantic: 'red',    updated_at: now.toISOString() },
-    { id: 'd7', client_id: 'c6', client_name: 'SC Immobilière Sud',   task_type: 'BILAN',          due_date: d(25),  status: 'ready',        urgency_semantic: 'green',  updated_at: now.toISOString() },
+    // SARL Dupont & Fils
+    { id: 'd01', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'TVA_CA3',        due_date: d(5),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'synced',        last_synced_at: iso } },
+    { id: 'd02', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'CFE',            due_date: d(5),  status: 'waiting_docs', urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_push',  last_synced_at: iso } },
+    { id: 'd03', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'DSN',            due_date: d(3),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso },
+    // SAS Technova
+    { id: 'd04', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'IS_Acompte',     due_date: d(14), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso } },
+    { id: 'd05', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'TVA_CA3',        due_date: d(14), status: 'ready',        urgency_semantic: 'orange', updated_at: iso },
+    { id: 'd06', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'PAIE',           due_date: d(6),  status: 'declared',     urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso } },
+    // EURL Martin Conseil
+    { id: 'd07', client_id: 'c3', client_name: 'EURL Martin Conseil',  task_type: 'DSN',            due_date: d(14), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
+    { id: 'd08', client_id: 'c3', client_name: 'EURL Martin Conseil',  task_type: 'TVA_CA12',       due_date: d(45), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
+    // SA Bâtiment Pro
+    { id: 'd09', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'LIASSE_FISCALE', due_date: d(30), status: 'ready',        urgency_semantic: 'green',  updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'conflict',      last_synced_at: iso } },
+    { id: 'd10', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'IS_Solde',       due_date: d(30), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
+    { id: 'd11', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'BILAN',          due_date: d(35), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
+    // SASU WebAgency
+    { id: 'd12', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'TVA_CA3',        due_date: d(60), status: 'declared',     urgency_semantic: 'green',  updated_at: iso },
+    { id: 'd13', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'PAIE',           due_date: d(7),  status: 'ready',        urgency_semantic: 'red',    updated_at: iso },
+    { id: 'd14', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'DAS2',           due_date: d(20), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
+    // SC Immobilière Sud
+    { id: 'd15', client_id: 'c6', client_name: 'SC Immobilière Sud',   task_type: 'BILAN',          due_date: d(25), status: 'ready',        urgency_semantic: 'green',  updated_at: iso },
+    { id: 'd16', client_id: 'c6', client_name: 'SC Immobilière Sud',   task_type: 'CFE',            due_date: d(4),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso },
+    // SCI Les Oliviers
+    { id: 'd17', client_id: 'c7', client_name: 'SCI Les Oliviers',     task_type: 'LIASSE_FISCALE', due_date: d(15), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
+    { id: 'd18', client_id: 'c7', client_name: 'SCI Les Oliviers',     task_type: 'IS_Acompte',     due_date: d(20), status: 'preparation',  urgency_semantic: 'orange', updated_at: iso },
+    // AE Moreau Consulting
+    { id: 'd19', client_id: 'c8', client_name: 'AE Moreau Consulting', task_type: 'TVA_CA3',        due_date: d(7),  status: 'ready',        urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_pull',  last_synced_at: iso } },
+    { id: 'd20', client_id: 'c8', client_name: 'AE Moreau Consulting', task_type: 'CVAE',           due_date: d(7),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso },
   ];
 }
 
-// ─── Task card ────────────────────────────────────────────────────────────────
+// ─── J-7 Alert banner ────────────────────────────────────────────────────────
 
-function TaskCard({
-  task,
-  onMove,
-}: {
-  task: FiscalTask;
-  onMove: (taskId: string, newStatus: FiscalTaskStatus) => void;
-}) {
-  const daysLeft = Math.ceil((new Date(task.due_date).getTime() - Date.now()) / 86_400_000);
-
-  const nextStatus: FiscalTaskStatus | null =
-    task.status === 'preparation'  ? 'waiting_docs' :
-    task.status === 'waiting_docs' ? 'ready' :
-    task.status === 'ready'        ? 'declared' :
-    null;
-
-  return (
-    <div className={`bg-white rounded-lg shadow-sm p-3 mb-2 ${URGENCY_BORDER[task.urgency_semantic]}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-gray-900 truncate">{task.client_name}</p>
-          <p className="text-xs text-gray-600 mt-0.5">{TASK_TYPE_LABELS[task.task_type] ?? task.task_type}</p>
-        </div>
-        <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${URGENCY_DOT[task.urgency_semantic]}`} />
-      </div>
-
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1 text-gray-500">
-          <Calendar className="w-3 h-3" />
-          <span style={{ fontSize: '11px' }}>
-            {new Date(task.due_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-            {' · '}
-            {daysLeft > 0 ? `J-${daysLeft}` : daysLeft === 0 ? 'Aujourd\'hui' : `J+${Math.abs(daysLeft)}`}
-          </span>
-        </div>
-        {nextStatus && (
-          <button
-            onClick={() => onMove(task.id, nextStatus)}
-            className="text-blue-600 hover:text-blue-800 transition-colors"
-            style={{ fontSize: '10px' }}
-            title="Passer à l'étape suivante"
-          >
-            Avancer →
-          </button>
-        )}
-      </div>
-
-      {task.note && (
-        <p className="mt-1.5 text-gray-500 italic truncate" style={{ fontSize: '10px' }}>{task.note}</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Kanban column ────────────────────────────────────────────────────────────
-
-function KanbanColumn({
-  column,
+function AlertBanner({
   tasks,
   onMove,
 }: {
-  column: KanbanColumn;
   tasks: FiscalTask[];
   onMove: (taskId: string, newStatus: FiscalTaskStatus) => void;
 }) {
-  const urgentCount = tasks.filter(t => t.urgency_semantic === 'red').length;
+  const alerts = useFiscalAlerts(tasks, 7);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (alerts.length === 0 || dismissed) return null;
 
   return (
-    <div className="flex flex-col flex-1 min-w-52 bg-gray-50 rounded-xl border border-gray-200">
-      <div className="px-3 py-2.5 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">{column.label}</h3>
-        <div className="flex items-center gap-1.5">
-          {urgentCount > 0 && (
-            <span className="flex items-center gap-0.5 text-red-500" style={{ fontSize: '11px' }}>
-              <AlertCircle className="w-3 h-3" />{urgentCount}
-            </span>
-          )}
-          <span className="bg-gray-200 text-gray-600 text-xs font-medium px-1.5 py-0.5 rounded-full">
-            {tasks.length}
-          </span>
+    <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          {alerts.length} échéance{alerts.length > 1 ? 's' : ''} à J-7 ou moins
         </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
+          aria-label="Masquer les alertes"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="flex-1 p-2 overflow-y-auto" style={{ minHeight: '160px', maxHeight: '60vh' }}>
-        {tasks.length === 0 ? (
-          <p className="text-center text-gray-400 text-xs mt-6">{column.emptyLabel}</p>
-        ) : (
-          tasks.map(task => (
-            <TaskCard key={task.id} task={task} onMove={onMove} />
-          ))
-        )}
-      </div>
+      <ul className="mt-3 space-y-1.5">
+        {alerts.map(({ task, daysLeft: dl }) => {
+          const next = STATUS_NEXT[task.status];
+          return (
+            <li
+              key={task.id}
+              className="flex items-center justify-between gap-3 rounded-lg bg-white border border-red-100 px-3 py-2"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {dl <= 0
+                  ? <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                  : <Clock         className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                }
+                <span className="text-xs font-medium text-gray-800 truncate">
+                  {task.client_name}
+                </span>
+                <Badge className="bg-red-100 text-red-700 border-red-200 border text-[10px] px-1.5 py-0 h-4">
+                  {TASK_TYPE_LABELS[task.task_type]}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[11px] font-mono font-bold text-red-600">
+                  {formatDaysLeft(dl)}
+                </span>
+                {next && (
+                  <button
+                    onClick={() => onMove(task.id, next)}
+                    className="flex items-center gap-0.5 text-[10px] text-blue-600 hover:text-blue-800 transition-colors font-medium"
+                  >
+                    {STATUS_CONFIG[next].label}
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+                {!next && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── Matrix cell ──────────────────────────────────────────────────────────────
+
+function MatrixCell({
+  task,
+  onMove,
+}: {
+  task: FiscalTask | undefined;
+  onMove: (taskId: string, newStatus: FiscalTaskStatus) => void;
+}) {
+  if (!task) {
+    return (
+      <TableCell className="text-center p-1.5 border border-gray-100">
+        <span className="text-gray-200 text-xs select-none">—</span>
+      </TableCell>
+    );
+  }
+
+  const dl = daysLeft(task.due_date);
+  const next = STATUS_NEXT[task.status];
+
+  return (
+    <TableCell className={`text-center p-1.5 border border-gray-100 ${cellBg(task)}`}>
+      <div className="flex flex-col items-center gap-0.5">
+        {/* Status badge */}
+        <span
+          className={`inline-block text-[10px] font-semibold rounded px-1.5 py-0.5 leading-tight ${badgeClasses(task)}`}
+        >
+          {STATUS_CONFIG[task.status].short}
+        </span>
+
+        {/* Days countdown */}
+        {task.status !== 'declared' && (
+          <span className="text-[9px] font-mono leading-none opacity-70 text-gray-600">
+            {formatDaysLeft(dl)}
+          </span>
+        )}
+
+        {/* Advance button */}
+        {next && (
+          <button
+            onClick={() => onMove(task.id, next)}
+            className="text-[9px] text-blue-500 hover:text-blue-700 transition-colors leading-none mt-0.5"
+            title={`→ ${STATUS_CONFIG[next].label}`}
+            aria-label={`Avancer vers ${STATUS_CONFIG[next].label}`}
+          >
+            →
+          </button>
+        )}
+
+        {/* Sync indicator */}
+        {task.sync && (
+          <span title={`Sync ${task.sync.source} · ${task.sync.sync_status}`}>
+            {SYNC_ICONS[task.sync.sync_status]}
+          </span>
+        )}
+      </div>
+    </TableCell>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function FiscalCalendar() {
   const navigate = useNavigate();
@@ -172,26 +297,51 @@ export function FiscalCalendar() {
     refreshUrgencies,
   } = useDashboardStore();
 
-  const displayTasks = fiscalTasks.length > 0 ? fiscalTasks : buildDemoTasks();
+  const displayTasks: FiscalTask[] =
+    fiscalTasks.length > 0 ? fiscalTasks : buildDemoTasks();
 
+  // Fetch on mount
   useEffect(() => {
-    fetchFiscalTasks().catch(() => {/* API not configured — demo mode */});
+    fetchFiscalTasks().catch(() => {/* demo mode */});
   }, [fetchFiscalTasks]);
 
-  // Refresh urgency indicators every minute, but only when the tab is visible
+  // Refresh urgency indicators every minute (tab-visible only)
   useEffect(() => {
-    const tick = () => {
-      if (!document.hidden) refreshUrgencies();
-    };
+    const tick = () => { if (!document.hidden) refreshUrgencies(); };
     const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
   }, [refreshUrgencies]);
 
-  const tasksByStatus = (status: FiscalTaskStatus) =>
-    displayTasks.filter(t => t.status === status);
+  // Build matrix: clientId → { taskType → task }
+  const clientOrder: string[] = [];
+  const clientNames: Record<string, string> = {};
+  const matrix: Record<string, Partial<Record<FiscalTaskType, FiscalTask>>> = {};
+
+  for (const task of displayTasks) {
+    const key = task.client_id;
+    if (!matrix[key]) {
+      clientOrder.push(key);
+      clientNames[key] = task.client_name;
+      matrix[key] = {};
+    }
+    // Keep the most urgent (nearest) task if duplicates exist for same type
+    const existing = matrix[key][task.task_type];
+    if (!existing || daysLeft(task.due_date) < daysLeft(existing.due_date)) {
+      matrix[key][task.task_type] = task;
+    }
+  }
+
+  // Flag columns that contain at least one J-7 alert
+  const columnHasAlert: Partial<Record<FiscalTaskType, boolean>> = {};
+  for (const type of TASK_TYPES) {
+    columnHasAlert[type] = clientOrder.some(cid => {
+      const t = matrix[cid]?.[type];
+      return t && t.status !== 'declared' && daysLeft(t.due_date) <= 7;
+    });
+  }
 
   return (
-    <div className="p-6">
+    <div className="p-6 min-h-screen bg-gray-50/40">
       {/* Back navigation */}
       <div className="mb-4">
         <button
@@ -202,24 +352,40 @@ export function FiscalCalendar() {
           Retour au tableau de bord
         </button>
       </div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+
+      {/* Page header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Calendrier fiscal 2026</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Suivi des obligations fiscales et sociales par client
+          <p className="text-sm text-gray-500 mt-0.5">
+            Vue matricielle — obligations par client × échéance déclarative
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Urgency legend */}
           <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
-            {(['green', 'orange', 'red'] as const).map(u => (
-              <div key={u} className="flex items-center gap-1">
-                <div className={`w-2.5 h-2.5 rounded-full ${URGENCY_DOT[u]}`} />
-                <span>{u === 'green' ? '> 21 j' : u === 'orange' ? '7–21 j' : '< 7 j'}</span>
-              </div>
-            ))}
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+              {'> 21 j'}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+              {'7–21 j'}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
+              {'≤ 7 j'}
+            </div>
           </div>
+
+          {/* Sync legend */}
+          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <Cloud className="w-3 h-3 text-blue-400" /><span>Sync OK</span>
+            <CloudLightning className="w-3 h-3 text-amber-400" /><span>En attente</span>
+            <CloudOff className="w-3 h-3 text-red-400" /><span>Conflit</span>
+          </div>
+
           <button
             onClick={() => fetchFiscalTasks()}
             disabled={loadingFiscalTasks}
@@ -231,16 +397,94 @@ export function FiscalCalendar() {
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {COLUMNS.map(col => (
-          <KanbanColumn
-            key={col.id}
-            column={col}
-            tasks={tasksByStatus(col.id)}
-            onMove={updateFiscalTaskStatus}
-          />
-        ))}
+      {/* J-7 alert banner */}
+      <AlertBanner tasks={displayTasks} onMove={updateFiscalTaskStatus} />
+
+      {/* Matrix table */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="border-collapse text-xs">
+            <TableHeader>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                {/* Sticky client-name header */}
+                <TableHead className="sticky left-0 z-20 bg-gray-50 border border-gray-200 min-w-44 max-w-52 font-semibold text-gray-700 text-xs">
+                  Client
+                </TableHead>
+
+                {/* Task-type headers */}
+                {TASK_TYPES.map(type => (
+                  <TableHead
+                    key={type}
+                    className={`border border-gray-200 text-center font-semibold text-[11px] px-2 min-w-16
+                      ${columnHasAlert[type] ? 'text-red-600' : 'text-gray-600'}`}
+                  >
+                    <div className="flex flex-col items-center gap-0.5">
+                      {columnHasAlert[type] && (
+                        <AlertTriangle className="w-2.5 h-2.5 text-red-400" />
+                      )}
+                      {TASK_TYPE_LABELS[type]}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {clientOrder.map((clientId, rowIdx) => (
+                <TableRow
+                  key={clientId}
+                  className={
+                    rowIdx % 2 === 0
+                      ? 'bg-white hover:bg-gray-50/60'
+                      : 'bg-gray-50/30 hover:bg-gray-50/60'
+                  }
+                >
+                  {/* Sticky client name */}
+                  <TableCell
+                    className="sticky left-0 z-10 border border-gray-200 font-medium text-gray-800 text-xs px-3 py-2 min-w-44 max-w-52 truncate"
+                    style={{ background: rowIdx % 2 === 0 ? '#ffffff' : '#f9fafb' }}
+                    title={clientNames[clientId]}
+                  >
+                    {clientNames[clientId]}
+                  </TableCell>
+
+                  {/* One cell per task type */}
+                  {TASK_TYPES.map(type => (
+                    <MatrixCell
+                      key={type}
+                      task={matrix[clientId]?.[type]}
+                      onMove={updateFiscalTaskStatus}
+                    />
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Status summary */}
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
+        {(
+          [
+            ['preparation',  'Prép.',  'bg-gray-300'],
+            ['waiting_docs', 'Docs',   'bg-blue-300'],
+            ['ready',        'Prêt',   'bg-emerald-300'],
+            ['declared',     'Déclaré','bg-emerald-500'],
+          ] as const
+        ).map(([status, label, color]) => {
+          const count = displayTasks.filter(t => t.status === status).length;
+          return (
+            <div
+              key={status}
+              className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-md px-2.5 py-1"
+            >
+              <span className={`w-2 h-2 rounded-sm ${color}`} />
+              <span className="font-medium">{label}</span>
+              <span className="text-gray-400">{count}</span>
+            </div>
+          );
+        })}
       </div>
 
       {fiscalTasks.length === 0 && (
