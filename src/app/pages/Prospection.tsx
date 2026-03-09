@@ -28,7 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import {
   type Prospect, type ProspectSource, type ProspectDirigeant,
   searchProspects,
@@ -273,6 +273,7 @@ export function Prospection() {
 
   // ── Sheet (prospect detail) ───────────────────────────────────────────────
   const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetTab, setSheetTab] = useState<'details' | 'timeline'>('details');
 
   // ── Sheet edit mode ───────────────────────────────────────────────────────
   const [isEditingSheet, setIsEditingSheet] = useState(false);
@@ -311,8 +312,9 @@ export function Prospection() {
     setDraftEstimatedValue(lead?.estimatedValue != null ? String(lead.estimatedValue) : '');
     setDraftNextActionDate(lead?.nextActionDate ?? '');
     setCrmSaved(false);
-    // Reset edit mode whenever we switch prospects
+    // Reset edit mode and tab whenever we switch prospects
     setIsEditingSheet(false);
+    setSheetTab('details');
   }, [sheetId, leads, notesMap]);
 
   // ── Load DB prospects on mount ────────────────────────────────────────────
@@ -1347,6 +1349,7 @@ export function Prospection() {
                 callLogs: l.callLogs,
                 estimatedValue: l.estimatedValue,
                 nextActionDate: l.nextActionDate,
+                leadScore: l.leadScore,
               }))}
               onMoveCard={moveCard}
               onCardClick={id => setSheetId(id)}
@@ -1626,8 +1629,36 @@ export function Prospection() {
                 </div>
               </SheetHeader>
 
+              {/* ── Tab navigation: Détails | Timeline ── */}
+              <div className="flex-shrink-0 border-b border-gray-100 px-6 pt-3 pb-0 bg-white">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setSheetTab('details')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors ${
+                      sheetTab === 'details'
+                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    📋 Détails
+                  </button>
+                  <button
+                    onClick={() => setSheetTab('timeline')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors ${
+                      sheetTab === 'timeline'
+                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🕐 Timeline
+                  </button>
+                </div>
+              </div>
+
               {/* ── Scrollable body ── */}
               <div className="flex-1 overflow-y-auto">
+                {sheetTab === 'details' ? (
+                  <>
 
                 {/* ── Inline edit form (visible when isEditingSheet) ── */}
                 {isEditingSheet && (
@@ -2014,6 +2045,10 @@ export function Prospection() {
                     </button>
                   </div>
                 </section>
+                  </>
+                ) : (
+                  <ProspectTimeline lead={activeLead} storeProspects={storeProspects} />
+                )}
               </div>
 
               {/* ── Sheet footer — quick actions ── */}
@@ -2311,5 +2346,165 @@ function EventStatusBadge({ status }: { status: RsvpStatus }) {
       {cfg.icon}
       {cfg.label}
     </span>
+  );
+}
+
+// ─── Timeline ─────────────────────────────────────────────────────────────────
+
+interface TimelineEvent {
+  date: Date;
+  icon: string;
+  label: string;
+  detail?: string;
+  color: string;
+}
+
+function ProspectTimeline({
+  lead,
+  storeProspects,
+}: {
+  lead: LeadEntry;
+  storeProspects: ProspectRow[];
+}) {
+  const storeRow = storeProspects.find(p => p.id === lead.id);
+
+  const events: TimelineEvent[] = useMemo(() => {
+    const raw: TimelineEvent[] = [];
+
+    // 1. Prospect créé
+    const createdAt = storeRow?.created_at;
+    if (createdAt) {
+      raw.push({
+        date: new Date(createdAt),
+        icon: '🏢',
+        label: 'Prospect ajouté',
+        detail: lead.nomSociete,
+        color: 'bg-gray-100 text-gray-600 border-gray-200',
+      });
+    }
+
+    // 2. Email initial envoyé
+    if (lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '📧',
+        label: 'Email initial envoyé',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
+      });
+    }
+
+    // 3. Email ouvert (exact open timestamp not stored; approximate with sent date)
+    if (lead.openCount > 0 && lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '👁️',
+        label: `Email ouvert ${lead.openCount} fois`,
+        detail: 'Horodatage exact non disponible — daté à l\'envoi',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      });
+    }
+
+    // 4. Lien cliqué (exact click timestamp not stored; approximate with sent date)
+    if (lead.clicked && lead.emailSentAt) {
+      raw.push({
+        date: new Date(lead.emailSentAt),
+        icon: '🖱️',
+        label: 'Lien / devis cliqué',
+        detail: 'Horodatage exact non disponible — daté à l\'envoi',
+        color: 'bg-violet-50 text-violet-700 border-violet-200',
+      });
+    }
+
+    // 5. Relances planifiées
+    if (lead.sequenceStep > 0 && lead.nextFollowUpDate) {
+      raw.push({
+        date: new Date(lead.nextFollowUpDate),
+        icon: '🔁',
+        label: `Relance ${lead.sequenceStep} planifiée`,
+        color: 'bg-amber-50 text-amber-700 border-amber-200',
+      });
+    }
+
+    // 6. Call logs (format: "[DD/MM/YYYY, HH:MM] note" from toLocaleString)
+    for (const log of lead.callLogs) {
+      const bracketMatch = log.match(/^\[([^\]]+)\]/);
+      const logDate = bracketMatch
+        ? (() => {
+            // parse "DD/MM/YYYY, HH:MM:SS" locale format
+            const parts = bracketMatch[1].split(/[\s,\/]+/);
+            if (parts.length >= 5) {
+              const [d, m, y, h, min] = parts;
+              const dd = Number(d), mm = Number(m), yyyy = Number(y), hh = Number(h), mi = Number(min);
+              if (
+                !isNaN(dd) && !isNaN(mm) && !isNaN(yyyy) && !isNaN(hh) && !isNaN(mi) &&
+                dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yyyy > 2000
+              ) {
+                const parsed = new Date(
+                  `${String(yyyy)}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mi).padStart(2, '0')}:00`,
+                );
+                if (!isNaN(parsed.getTime())) return parsed;
+              }
+            }
+            return new Date();
+          })()
+        : new Date();
+      raw.push({
+        date: logDate,
+        icon: '📞',
+        label: 'Appel journalisé',
+        detail: bracketMatch ? log.replace(/^\[[^\]]+\]\s*/, '') : log,
+        color: 'bg-purple-50 text-purple-700 border-purple-200',
+      });
+    }
+
+    // 7. Next action date
+    if (lead.nextActionDate) {
+      raw.push({
+        date: new Date(lead.nextActionDate),
+        icon: '📅',
+        label: 'Prochaine action prévue',
+        color: 'bg-sky-50 text-sky-700 border-sky-200',
+      });
+    }
+
+    return raw.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [lead, storeRow]);
+
+  if (events.length === 0) {
+    return (
+      <div className="px-6 py-10 text-center text-xs text-gray-400 italic">
+        Aucun événement enregistré pour ce prospect.
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-6 py-5">
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-4">
+        <Clock className="w-3.5 h-3.5" /> Historique chronologique
+      </h3>
+      <ol className="relative border-l border-gray-200 space-y-5 ml-2">
+        {events.map((event, i) => (
+          <li key={i} className="ml-4">
+            <span className="absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-sm select-none">
+              {event.icon}
+            </span>
+            <div className={`rounded-lg border px-3 py-2 ${event.color}`}>
+              <p className="text-xs font-semibold">{event.label}</p>
+              {event.detail && (
+                <p className="text-[11px] mt-0.5 opacity-80 leading-relaxed">{event.detail}</p>
+              )}
+              <p className="text-[10px] mt-1 opacity-60">
+                {event.date.toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
