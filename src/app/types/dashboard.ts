@@ -79,6 +79,28 @@ export interface ClientKYC extends PappersCompanyResponse {
   submittedAt: string;
 }
 
+// ─── Bidirectional Sync (Impôts.gouv / Pennylane) ───────────────────────────
+
+/** The external system a fiscal task was last synchronised with. */
+export type SyncSource = 'impots_gouv' | 'pennylane' | 'manual';
+
+/** Synchronisation state between the cabinet system and an external source. */
+export type SyncStatus =
+  | 'synced'        // in sync with remote
+  | 'pending_push'  // local change not yet pushed to remote
+  | 'pending_pull'  // remote change not yet pulled locally
+  | 'conflict'      // divergent states — human resolution required
+  | 'error';        // sync attempt failed
+
+export interface SyncMetadata {
+  source: SyncSource;
+  /** ID of the record in the external system */
+  external_id?: string;
+  /** ISO timestamp of the last successful sync */
+  last_synced_at: string;
+  sync_status: SyncStatus;
+}
+
 // ─── Fiscal & Social Tasks ───────────────────────────────────────────────────
 
 export type FiscalTaskType =
@@ -121,6 +143,8 @@ export interface FiscalTask {
   assigned_to?: string;
   /** ISO date when last updated */
   updated_at: string;
+  /** Bidirectional sync metadata (Impôts.gouv / Pennylane) */
+  sync?: SyncMetadata;
 }
 
 // ─── AI Email Draft (RAG BOFiP) ──────────────────────────────────────────────
