@@ -689,6 +689,8 @@ export interface ValidatedQuote {
   monthlyTotal: number;
   setupFees: number;
   quoteData: Record<string, unknown>;
+  /** Statut du devis — présent uniquement quand explicitement sélectionné depuis Supabase */
+  status?: QuoteStatus;
 }
 
 export async function getValidatedQuotes(): Promise<
@@ -711,6 +713,50 @@ export async function getValidatedQuotes(): Promise<
         const c = asClientRecord(row.clients);
         return {
           quoteId: row.id as string,
+          clientName: (c.client_name as string) ?? '',
+          clientEmail: (c.client_email as string | null) ?? null,
+          siret: (c.siret as string | null) ?? null,
+          legalForm: (c.legal_form as string | null) ?? null,
+          taxRegime: (c.tax_regime as string | null) ?? null,
+          activity: (c.secteur_activite as string | null) ?? null,
+          monthlyTotal: (row.monthly_total as number) ?? 0,
+          setupFees: (row.setup_fees as number) ?? 0,
+          quoteData: (row.quote_data as Record<string, unknown>) ?? {},
+        };
+      });
+
+    return { success: true, quotes };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Récupère les devis aux statuts "VALIDATED" et "SENT" pour la page Lettre de Mission.
+ * Inclut le champ `status` pour permettre le suivi visuel de la signature électronique.
+ */
+export async function getQuotesForLDM(): Promise<
+  { success: true; quotes: ValidatedQuote[] } | { success: false; error: string }
+> {
+  try {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, status, monthly_total, setup_fees, quote_data, clients(id, client_name, client_email, siret, legal_form, tax_regime, secteur_activite)')
+      .in('status', ['VALIDATED', 'SENT'])
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const quotes: ValidatedQuote[] = (data ?? [])
+      .filter(row => row.clients !== null)
+      .map(row => {
+        const c = asClientRecord(row.clients);
+        return {
+          quoteId: row.id as string,
+          status: (row.status as QuoteStatus) ?? 'VALIDATED',
           clientName: (c.client_name as string) ?? '',
           clientEmail: (c.client_email as string | null) ?? null,
           siret: (c.siret as string | null) ?? null,

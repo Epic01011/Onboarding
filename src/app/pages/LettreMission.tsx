@@ -11,14 +11,14 @@
  *     sont ajoutées au document généré.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ArrowLeft, FileText, Download, Printer,
   CheckCircle2, CloudDownload, Loader2,
   Mail, PenLine, X, Send, ExternalLink, AlertCircle,
   Building2, User, Euro, Library, Edit2, Plus,
-  Paperclip, ChevronDown, ChevronUp,
+  Paperclip, ChevronDown, ChevronUp, RefreshCw,
 } from 'lucide-react';
 import { getCabinetInfo } from '../utils/servicesStorage';
 import type { LdmConfigState } from '../components/StepLdmConfig';
@@ -36,18 +36,19 @@ import {
   buildAnnexesHtml,
 } from '../utils/ldmTemplateEngine';
 import {
-  getValidatedQuotes,
+  getQuotesForLDM,
   updateQuoteLdmData,
   updateQuoteStatus,
   getProspectPricingData,
   type ValidatedQuote,
 } from '../utils/supabaseSync';
 import { sendEmail, buildLDMEmail } from '../services/emailService';
-import { createSignatureRequest as createYousignRequest } from '../services/yousignApi';
-import { createSignatureTransaction as createJeSignRequest } from '../services/jesignexpertApi';
+import { createSignatureRequest as createYousignRequest, getSignatureStatus } from '../services/yousignApi';
+import { createSignatureTransaction as createJeSignRequest, getTransactionStatus } from '../services/jesignexpertApi';
 import { generateLDMPdf } from '../services/pdfGenerator';
 import { useServices } from '../context/ServicesContext';
 import { toast } from 'sonner';
+import { Badge } from '../components/ui/badge';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,11 @@ const DEFAULT_LDM_CONFIG: LdmConfigState = {
 
 const inputCls =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-shadow';
+
+/** Intervalle de polling pour le suivi du statut de signature (en ms). */
+const SIGNATURE_POLL_INTERVAL_MS = 30_000;
+/** Libellé affiché dans l'UI correspondant à SIGNATURE_POLL_INTERVAL_MS. */
+const SIGNATURE_POLL_INTERVAL_LABEL = '30 s';
 
 // ─── Manual overrides type ────────────────────────────────────────────────────
 
@@ -301,6 +307,48 @@ function EditableInfoRow({
   );
 }
 
+// ─── Signature status badge ───────────────────────────────────────────────────
+
+/** Statut visuel de la signature électronique d'un document. */
+export type DocSignatureStatus = 'draft' | 'sent' | 'read' | 'signed';
+
+/**
+ * Badge shadcn affichant le statut de signature d'un document :
+ *  - Brouillon (Gris)   → document non encore envoyé
+ *  - Envoyé   (Bleu)   → envoyé au signataire, en attente
+ *  - Lu       (Jaune)  → le signataire a ouvert le document
+ *  - Signé    (Vert)   → signature complétée
+ */
+function SignatureBadge({ status }: { status: DocSignatureStatus }) {
+  if (status === 'signed') {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 gap-1">
+        <CheckCircle2 className="w-3 h-3" />
+        Signé
+      </Badge>
+    );
+  }
+  if (status === 'read') {
+    return (
+      <Badge className="bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-100">
+        Lu
+      </Badge>
+    );
+  }
+  if (status === 'sent') {
+    return (
+      <Badge className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-100">
+        Envoyé
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-gray-500 border-gray-300 bg-gray-50 hover:bg-gray-50">
+      Brouillon
+    </Badge>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function LettreMission() {
@@ -335,8 +383,15 @@ export function LettreMission() {
   // ── Prospect pricing data (CRM enrichment) ───────────────────────────────────
   const [prospectPricingData, setProspectPricingData] = useState<Record<string, unknown> | null>(null);
 
+  // ── Electronic signature tracking ─────────────────────────────────────────────
+  const [docSignatureStatus, setDocSignatureStatus] = useState<DocSignatureStatus>('draft');
+  const [localSignatureId, setLocalSignatureId] = useState<string | null>(null);
+  const [localSignatureProvider, setLocalSignatureProvider] = useState<'yousign' | 'jesignexpert'>('yousign');
+  // Ref to avoid stale closure in polling interval
+  const pollingRef = useRef<{ id: string; provider: 'yousign' | 'jesignexpert'; quoteId: string } | null>(null);
+
   useEffect(() => {
-    getValidatedQuotes()
+    getQuotesForLDM()
       .then(res => {
         if (res.success) setValidatedQuotes(res.quotes);
       })
@@ -359,6 +414,82 @@ export function LettreMission() {
       }
     });
   }, [selectedQuote]);
+
+  // ── Derive docSignatureStatus from selected quote ─────────────────────────────
+  useEffect(() => {
+    if (!selectedQuote) {
+      setDocSignatureStatus('draft');
+      setLocalSignatureId(null);
+      pollingRef.current = null;
+      return;
+    }
+    // Restore signatureId saved in quoteData after a previous send
+    const qd = selectedQuote.quoteData as Record<string, unknown>;
+    const savedId = qd.signatureId as string | undefined;
+    const savedProvider = qd.signatureProvider as 'yousign' | 'jesignexpert' | undefined;
+    if (savedId) {
+      setLocalSignatureId(savedId);
+      if (savedProvider) setLocalSignatureProvider(savedProvider);
+      pollingRef.current = {
+        id: savedId,
+        provider: savedProvider ?? 'yousign',
+        quoteId: selectedQuote.quoteId,
+      };
+    } else {
+      setLocalSignatureId(null);
+      pollingRef.current = null;
+    }
+    // Map quote status to visual badge status
+    if (selectedQuote.status === 'SIGNED') {
+      setDocSignatureStatus('signed');
+    } else if (selectedQuote.status === 'SENT') {
+      setDocSignatureStatus('sent');
+    } else {
+      setDocSignatureStatus('draft');
+    }
+  }, [selectedQuote]);
+
+  // ── Polling — met à jour le statut en temps réel quand le client signe ────────
+  useEffect(() => {
+    if (!localSignatureId || docSignatureStatus === 'signed') return;
+
+    const poll = async () => {
+      const ctx = pollingRef.current;
+      if (!ctx) return;
+      try {
+        if (ctx.provider === 'jesignexpert') {
+          const res = await getTransactionStatus(ctx.id);
+          if (!res.success) return;
+          if (
+            res.status === 'completed' ||
+            res.signerStatuses?.some(s => s.status === 'signed')
+          ) {
+            setDocSignatureStatus('signed');
+            await updateQuoteStatus(ctx.quoteId, 'SIGNED');
+            // Update local quotes list so the badge stays correct
+            setValidatedQuotes(prev =>
+              prev.map(q => q.quoteId === ctx.quoteId ? { ...q, status: 'SIGNED' } : q)
+            );
+          }
+        } else {
+          const res = await getSignatureStatus(ctx.id);
+          if (!res.success) return;
+          if (res.status === 'done' || res.signerStatus === 'signed') {
+            setDocSignatureStatus('signed');
+            await updateQuoteStatus(ctx.quoteId, 'SIGNED');
+            setValidatedQuotes(prev =>
+              prev.map(q => q.quoteId === ctx.quoteId ? { ...q, status: 'SIGNED' } : q)
+            );
+          }
+        }
+      } catch {
+        // Ignore transient polling errors
+      }
+    };
+
+    const intervalId = setInterval(poll, SIGNATURE_POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [localSignatureId, localSignatureProvider, docSignatureStatus]);
 
   // ── Auto-derived base preview data ───────────────────────────────────────────
   const autoPreviewData: DocumentPreviewData | null = useMemo(
@@ -676,6 +807,18 @@ export function LettreMission() {
         const label = signatureProvider === 'jesignexpert' ? 'JeSignExpert' : 'Yousign';
         toast.success(raw.demo ? `LDM envoyée (mode démo ${label})` : `LDM envoyée via ${label} ✓`);
 
+        // Mise à jour du statut de signature local
+        setDocSignatureStatus('sent');
+        if (signatureId) {
+          setLocalSignatureId(signatureId);
+          setLocalSignatureProvider(signatureProvider);
+          pollingRef.current = {
+            id: signatureId,
+            provider: signatureProvider,
+            quoteId: selectedQuote?.quoteId ?? '',
+          };
+        }
+
         if (selectedQuote) {
           const ldmResult = await updateQuoteLdmData(selectedQuote.quoteId, {
             missionsSelectionnees: previewData.missionsSelectionnees,
@@ -695,9 +838,15 @@ export function LettreMission() {
           if (!ldmResult.success) {
             toast.warning("Les données LDM n'ont pas pu être liées au devis. Le dossier onboarding devra être rempli manuellement.");
           }
-          const statusResult = await updateQuoteStatus(selectedQuote.quoteId, 'SIGNED');
+          // Statut → SENT (le statut SIGNED sera mis à jour automatiquement via le polling)
+          const statusResult = await updateQuoteStatus(selectedQuote.quoteId, 'SENT');
           if (!statusResult.success) {
             toast.warning("Le statut du devis n'a pas pu être mis à jour. Actualisez manuellement depuis le tableau de bord.");
+          } else {
+            // Update local list to reflect new status
+            setValidatedQuotes(prev =>
+              prev.map(q => q.quoteId === selectedQuote.quoteId ? { ...q, status: 'SENT' } : q)
+            );
           }
         }
       } else {
@@ -740,9 +889,14 @@ export function LettreMission() {
                 <FileText className="w-4 h-4 text-violet-700" />
               </div>
               <div>
-                <h1 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
-                  Lettre de Mission
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
+                    Lettre de Mission
+                  </h1>
+                  {!manualMode && (selectedQuote || docSignatureStatus !== 'draft') && (
+                    <SignatureBadge status={docSignatureStatus} />
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 hidden sm:block">
                   {manualMode ? 'Saisie manuelle' : 'Générée depuis le devis validé'}
                 </p>
@@ -787,12 +941,14 @@ export function LettreMission() {
             </button>
             <button
               onClick={handleOpenSignModal}
-              disabled={!hasQuote}
+              disabled={!hasQuote || docSignatureStatus === 'signed'}
               className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-violet-300 bg-violet-50 text-xs sm:text-sm text-violet-700 hover:bg-violet-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Envoyer la LDM en signature électronique"
+              title={docSignatureStatus === 'signed' ? 'Document déjà signé' : 'Envoyer la LDM en signature électronique'}
             >
               <PenLine className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Signer</span>
+              <span className="hidden sm:inline">
+                {docSignatureStatus === 'sent' ? 'Renvoyer' : 'Signer'}
+              </span>
             </button>
           </div>
         </div>
@@ -829,7 +985,7 @@ export function LettreMission() {
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <CloudDownload className="w-4 h-4 text-emerald-600" />
-                  <p className="text-sm font-semibold text-gray-800">Devis validé</p>
+                  <p className="text-sm font-semibold text-gray-800">Devis</p>
                   {loadingQuotes && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin ml-auto" />}
                 </div>
                 {!loadingQuotes && validatedQuotes.length === 0 ? (
@@ -849,14 +1005,21 @@ export function LettreMission() {
                     }}
                     disabled={loadingQuotes}
                   >
-                    <option value="">— Sélectionner un devis VALIDÉ —</option>
-                    {validatedQuotes.map(q => (
-                      <option key={q.quoteId} value={q.quoteId}>
-                        {q.clientName}
-                        {q.legalForm ? ` · ${q.legalForm}` : ''}
-                        {` · ${q.monthlyTotal.toLocaleString('fr-FR')} €/mois`}
-                      </option>
-                    ))}
+                    <option value="">— Sélectionner un devis —</option>
+                    {validatedQuotes.map(q => {
+                      const statusSuffix =
+                        q.status === 'SIGNED' ? ' ✓ Signé' :
+                        q.status === 'SENT'   ? ' · Envoyé' :
+                        '';
+                      return (
+                        <option key={q.quoteId} value={q.quoteId}>
+                          {q.clientName}
+                          {q.legalForm ? ` · ${q.legalForm}` : ''}
+                          {` · ${q.monthlyTotal.toLocaleString('fr-FR')} €/mois`}
+                          {statusSuffix}
+                        </option>
+                      );
+                    })}
                   </select>
                 )}
               </div>
@@ -1028,10 +1191,42 @@ export function LettreMission() {
                   </button>
                   <button
                     onClick={handleOpenSignModal}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
+                    disabled={docSignatureStatus === 'signed'}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title={docSignatureStatus === 'signed' ? 'Document déjà signé' : 'Envoyer pour signature électronique'}
                   >
-                    <PenLine className="w-3.5 h-3.5" />Signature
+                    <PenLine className="w-3.5 h-3.5" />
+                    {docSignatureStatus === 'sent' ? 'Renvoyer' : 'Signature'}
                   </button>
+                </div>
+
+                {/* Signature status card */}
+                <div className={`rounded-xl border p-3 space-y-2 ${
+                  docSignatureStatus === 'signed' ? 'bg-emerald-50 border-emerald-200' :
+                  docSignatureStatus === 'read'   ? 'bg-yellow-50 border-yellow-200' :
+                  docSignatureStatus === 'sent'   ? 'bg-blue-50 border-blue-200' :
+                  'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-600">Statut signature</span>
+                    <SignatureBadge status={docSignatureStatus} />
+                  </div>
+                  {docSignatureStatus === 'sent' && localSignatureId && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-blue-600">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Suivi automatique toutes les {SIGNATURE_POLL_INTERVAL_LABEL}
+                    </div>
+                  )}
+                  {docSignatureStatus === 'signed' && (
+                    <p className="text-[10px] text-emerald-600 font-medium">
+                      La lettre de mission a été signée électroniquement ✓
+                    </p>
+                  )}
+                  {docSignatureStatus === 'draft' && (
+                    <p className="text-[10px] text-gray-400">
+                      Cliquez sur « Signature » pour envoyer la LDM au signataire.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -1322,16 +1517,26 @@ export function LettreMission() {
 
               {signatureStatus === 'success' && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-800">
-                        LDM envoyée en signature{' '}
-                        {signatureDemo && <span className="text-xs font-normal bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full ml-1">Démo</span>}
+                  <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold text-emerald-800">LDM envoyée en signature</p>
+                        {signatureDemo && (
+                          <span className="text-xs font-normal bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Démo</span>
+                        )}
+                        <SignatureBadge status="sent" />
+                      </div>
+                      <p className="text-xs text-emerald-700">
+                        Email envoyé à <strong>{previewData.clientEmail}</strong> via{' '}
+                        {signatureProvider === 'jesignexpert' ? 'JeSignExpert' : 'Yousign'}.
                       </p>
-                      <p className="text-xs text-emerald-700 mt-0.5">
-                        Email envoyé à <strong>{previewData.clientEmail}</strong> via {signatureProvider === 'jesignexpert' ? 'JeSignExpert' : 'Yousign'}.
-                      </p>
+                      {localSignatureId && (
+                        <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" />
+                          Statut mis à jour automatiquement toutes les {SIGNATURE_POLL_INTERVAL_LABEL}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {signingUrl && (
@@ -1372,8 +1577,8 @@ export function LettreMission() {
                   disabled={!previewData.clientEmail}
                   className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-sm font-medium transition-colors"
                 >
-                  <PenLine className="w-4 h-4" />
-                  Envoyer en signature
+                  <Send className="w-4 h-4" />
+                  Envoyer pour signature
                 </button>
               )}
             </div>
