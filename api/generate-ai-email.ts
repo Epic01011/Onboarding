@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * POST /api/generate-ai-email
  * Body JSON :
  * {
- *   provider: 'claude' | 'openai',
+ *   provider: 'claude' | 'openai' | 'perplexity',
  *   apiKey: string,
  *   systemPrompt: string,
  *   userPrompt: string,
@@ -32,7 +32,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const UPSTREAM_TIMEOUT_MS = 25_000;
 
 interface GenerateEmailBody {
-  provider: 'claude' | 'openai';
+  provider: 'claude' | 'openai' | 'perplexity';
   apiKey: string;
   systemPrompt: string;
   userPrompt: string;
@@ -154,6 +154,53 @@ async function callOpenAI(
   }
 }
 
+// ─── Perplexity ──────────────────────────────────────────────────────────────
+
+async function callPerplexity(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  maxTokens: number,
+): Promise<string> {
+  const { signal, clear } = withTimeout(UPSTREAM_TIMEOUT_MS);
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
+      const msg = err?.error?.message ?? `Perplexity API error ${response.status}`;
+      const gatewayStatus = mapHttpStatus(response.status);
+      throw Object.assign(new Error(msg), { gatewayStatus });
+    }
+
+    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+    return data.choices?.[0]?.message?.content ?? '';
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw Object.assign(new Error('Perplexity API timed out'), { gatewayStatus: mapErrorStatus(err) });
+    }
+    throw err;
+  } finally {
+    clear();
+  }
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export default async function handler(
@@ -187,8 +234,8 @@ export default async function handler(
     return;
   }
 
-  if (provider !== 'claude' && provider !== 'openai') {
-    res.status(400).json({ error: 'provider must be "claude" or "openai"' });
+  if (provider !== 'claude' && provider !== 'openai' && provider !== 'perplexity') {
+    res.status(400).json({ error: 'provider must be "claude", "openai" or "perplexity"' });
     return;
   }
 
@@ -198,6 +245,8 @@ export default async function handler(
     let content: string;
     if (provider === 'claude') {
       content = await callClaude(apiKey, systemPrompt, userPrompt, model ?? 'claude-3-5-sonnet-20241022', tokens);
+    } else if (provider === 'perplexity') {
+      content = await callPerplexity(apiKey, systemPrompt, userPrompt, model ?? 'sonar-pro', tokens);
     } else {
       content = await callOpenAI(apiKey, systemPrompt, userPrompt, model ?? 'gpt-4o-mini', tokens);
     }

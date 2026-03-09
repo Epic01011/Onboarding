@@ -31,7 +31,7 @@ export interface ServiceConnections {
   pappers: ServiceConnection;
 }
 
-export type AiProvider = 'claude' | 'openai';
+export type AiProvider = 'claude' | 'openai' | 'perplexity';
 
 export interface CabinetInfo {
   nom: string;
@@ -49,7 +49,9 @@ export interface CabinetInfo {
   cabinetLogoUrl?: string;
   /** Clé API IA (Claude Anthropic ou OpenAI) */
   aiApiKey?: string;
-  /** Fournisseur IA sélectionné */
+  /** Clé API Perplexity (recherche et synthèse web) */
+  perplexityApiKey?: string;
+  /** Fournisseur IA par défaut pour le cabinet */
   aiProvider?: AiProvider;
 }
 
@@ -83,6 +85,7 @@ export const defaultCabinetInfo: CabinetInfo = {
   capitalSocial: '',
   cabinetLogoUrl: '',
   aiApiKey: '',
+  perplexityApiKey: '',
   aiProvider: 'claude',
 };
 
