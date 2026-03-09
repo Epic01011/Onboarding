@@ -49,8 +49,12 @@ interface SettingsFormValues {
   cabinet_name: string;
   expert_name: string;
   logo_url: string;
-  ai_provider: 'claude' | 'openai';
+  /** IA par défaut du cabinet */
+  ai_provider: 'claude' | 'openai' | 'perplexity';
+  /** Clé API Anthropic (Claude) ou OpenAI */
   ai_api_key: string;
+  /** Clé API Perplexity (recherche et synthèse web) */
+  perplexity_api_key: string;
   // SIREN / firm identity
   siren: string;
   siret: string;
@@ -510,6 +514,7 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showPerplexityKey, setShowPerplexityKey] = useState(false);
   const [supabaseReport, setSupabaseReport] = useState<SupabaseConnectionReport | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [checkingKvBridge, setCheckingKvBridge] = useState(false);
@@ -547,6 +552,7 @@ export function SettingsPage() {
       logo_url: '',
       ai_provider: 'claude',
       ai_api_key: '',
+      perplexity_api_key: '',
       siren: '',
       siret: '',
       adresse: '',
@@ -647,7 +653,7 @@ export function SettingsPage() {
       try {
         const { data, error } = await supabase
           .from('cabinet_settings')
-          .select('cabinet_name,expert_name,logo_url,ai_provider,ai_api_key,siren,siret,adresse,code_postal,ville,forme_juridique,code_naf,capital_social')
+          .select('cabinet_name,expert_name,logo_url,ai_provider,ai_api_key,perplexity_api_key,siren,siret,adresse,code_postal,ville,forme_juridique,code_naf,capital_social')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -666,9 +672,16 @@ export function SettingsPage() {
             toast.warning('Impossible de déchiffrer votre clé IA. Veuillez la renseigner à nouveau.');
           }
 
-          // Normalise ai_provider: DB default was 'anthropic', UI uses 'claude'/'openai'
-          const provider: 'claude' | 'openai' =
-            data.ai_provider === 'openai' ? 'openai' : 'claude';
+          // Decrypt the Perplexity key
+          const decryptedPerplexityKey = data.perplexity_api_key
+            ? await decryptApiKey(data.perplexity_api_key, user.id)
+            : '';
+
+          // Normalise ai_provider: DB default was 'anthropic', UI uses 'claude'/'openai'/'perplexity'
+          const provider: 'claude' | 'openai' | 'perplexity' =
+            data.ai_provider === 'openai' ? 'openai'
+            : data.ai_provider === 'perplexity' ? 'perplexity'
+            : 'claude';
 
           // Use reset() so react-hook-form treats loaded values as the new baseline.
           reset({
@@ -677,6 +690,7 @@ export function SettingsPage() {
             logo_url: data.logo_url ?? '',
             ai_provider: provider,
             ai_api_key: decryptedKey,
+            perplexity_api_key: decryptedPerplexityKey,
             siren: data.siren ?? '',
             siret: data.siret ?? '',
             adresse: data.adresse ?? '',
@@ -844,7 +858,27 @@ export function SettingsPage() {
         }
       }
 
+      // Encrypt the Perplexity API key before persisting.
+      let encryptedPerplexityKey: string | null = null;
+      const trimmedPerplexityKey = (values.perplexity_api_key ?? '').trim();
+      if (trimmedPerplexityKey) {
+        if (!crypto?.subtle) {
+          throw new Error(
+            "Le chiffrement n'est pas disponible. Assurez-vous d'utiliser une connexion HTTPS."
+          );
+        }
+        encryptedPerplexityKey = await encryptApiKey(trimmedPerplexityKey, user.id);
+        if (!encryptedPerplexityKey) {
+          throw new Error('Le chiffrement de la clé Perplexity a échoué. Réessayez ou vérifiez votre navigateur.');
+        }
+      }
+
       // Columns must match exactly: public.cabinet_settings schema
+      const normalizedProvider: 'claude' | 'openai' | 'perplexity' =
+        values.ai_provider === 'openai' ? 'openai'
+        : values.ai_provider === 'perplexity' ? 'perplexity'
+        : 'claude';
+
       const { error } = await supabase
         .from('cabinet_settings')
         .upsert(
@@ -853,8 +887,9 @@ export function SettingsPage() {
             cabinet_name: (values.cabinet_name ?? '').trim(),
             expert_name: (values.expert_name ?? '').trim(),
             logo_url: (values.logo_url ?? '').trim() || null,
-            ai_provider: values.ai_provider === 'openai' ? 'openai' : 'claude',
+            ai_provider: normalizedProvider,
             ai_api_key: encryptedKey,
+            perplexity_api_key: encryptedPerplexityKey ?? '',
             siren: (values.siren ?? '').trim() || null,
             siret: (values.siret ?? '').trim() || null,
             adresse: (values.adresse ?? '').trim() || null,
@@ -880,7 +915,7 @@ export function SettingsPage() {
         nom: (values.cabinet_name ?? '').trim(),
         expertNom: (values.expert_name ?? '').trim(),
         cabinetLogoUrl: (values.logo_url ?? '').trim() || undefined,
-        aiProvider: values.ai_provider === 'openai' ? 'openai' : 'claude',
+        aiProvider: normalizedProvider,
         siren: (values.siren ?? '').trim(),
         adresse: (values.adresse ?? '').trim(),
         codePostal: (values.code_postal ?? '').trim(),
@@ -971,8 +1006,9 @@ export function SettingsPage() {
       cabinet_name: 'Nom du cabinet',
       expert_name: "Nom de l'expert",
       logo_url: 'URL du logo',
-      ai_provider: 'Fournisseur IA',
-      ai_api_key: 'Clé API',
+      ai_provider: 'IA par défaut',
+      ai_api_key: 'Clé API Anthropic / OpenAI',
+      perplexity_api_key: 'Clé API Perplexity',
       siren: 'SIREN',
       siret: 'SIRET',
       adresse: 'Adresse',
@@ -1236,16 +1272,16 @@ export function SettingsPage() {
                 <SectionHeader
                   icon={Bot}
                   title="Configuration de l'IA"
-                  description="Sélectionnez votre fournisseur d'IA et renseignez votre clé API pour activer la génération automatique de réponses dans l'Inbox IA."
+                  description="Configurez vos clés API et choisissez l'IA par défaut pour l'ensemble du cabinet."
                 />
                 <div className="space-y-5">
-                  <Field label="Fournisseur IA">
+                  <Field label="IA par défaut du cabinet">
                     <Select
                       value={aiProvider}
-                      onValueChange={val => setValue('ai_provider', val as 'claude' | 'openai', { shouldDirty: true })}
+                      onValueChange={val => setValue('ai_provider', val as 'claude' | 'openai' | 'perplexity', { shouldDirty: true })}
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Sélectionner un fournisseur" />
+                        <SelectValue placeholder="Sélectionner l'IA par défaut" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="claude">
@@ -1260,27 +1296,35 @@ export function SettingsPage() {
                             GPT (OpenAI)
                           </span>
                         </SelectItem>
+                        <SelectItem value="perplexity">
+                          <span className="flex items-center gap-2">
+                            <span className="text-base">🔍</span>
+                            Perplexity AI
+                          </span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-gray-400 mt-1.5">
                       {aiProvider === 'claude'
                         ? 'Utilise claude-3-5-sonnet-20241022 par défaut.'
-                        : 'Utilise gpt-4o-mini par défaut.'}
+                        : aiProvider === 'openai'
+                        ? 'Utilise gpt-4o-mini par défaut.'
+                        : 'Utilise sonar-pro par défaut (recherche web en temps réel).'}
                     </p>
                   </Field>
                   <Field
-                    label="Clé API"
+                    label="Clé API Anthropic (Claude) / OpenAI"
                     hint={
-                      aiProvider === 'claude'
-                        ? 'Disponible sur console.anthropic.com → API Keys'
-                        : 'Disponible sur platform.openai.com → API Keys'
+                      aiProvider === 'openai'
+                        ? 'Disponible sur platform.openai.com → API Keys'
+                        : 'Disponible sur console.anthropic.com → API Keys'
                     }
                   >
                     <div className="relative">
                       <Input
                         {...register('ai_api_key')}
                         type={showApiKey ? 'text' : 'password'}
-                        placeholder={aiProvider === 'claude' ? 'sk-ant-api03-…' : 'sk-proj-…'}
+                        placeholder={aiProvider === 'openai' ? 'sk-proj-…' : 'sk-ant-api03-…'}
                         className="pr-10 font-mono text-sm"
                         autoComplete="off"
                         spellCheck={false}
@@ -1299,12 +1343,39 @@ export function SettingsPage() {
                       </button>
                     </div>
                   </Field>
+                  <Field
+                    label="Clé API Perplexity"
+                    hint="Disponible sur www.perplexity.ai → Settings → API → Generate"
+                  >
+                    <div className="relative">
+                      <Input
+                        {...register('perplexity_api_key')}
+                        type={showPerplexityKey ? 'text' : 'password'}
+                        placeholder="pplx-…"
+                        className="pr-10 font-mono text-sm"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPerplexityKey(v => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                        tabIndex={-1}
+                        aria-label={showPerplexityKey ? 'Masquer la clé' : 'Afficher la clé'}
+                      >
+                        {showPerplexityKey
+                          ? <EyeOff className="w-4 h-4" />
+                          : <Eye className="w-4 h-4" />
+                        }
+                      </button>
+                    </div>
+                  </Field>
                   <div className="flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
                     <ShieldCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-green-700 leading-relaxed">
-                      Votre clé API est <strong>chiffrée (AES-256-GCM)</strong> avant d'être stockée.
+                      Vos clés API sont <strong>chiffrées (AES-256-GCM)</strong> avant d'être stockées.
                       Aucune clé en clair n'est conservée dans la base de données.
-                      La clé est déchiffrée uniquement en mémoire, lors de la génération de réponses.
+                      Les clés sont déchiffrées uniquement en mémoire, lors de la génération de réponses.
                     </p>
                   </div>
                 </div>
