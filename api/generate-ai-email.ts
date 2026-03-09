@@ -167,7 +167,7 @@ async function callOpenAI(
 
 // ─── Perplexity ──────────────────────────────────────────────────────────────
 
-async function callPerplexity(
+async function _callPerplexity(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,

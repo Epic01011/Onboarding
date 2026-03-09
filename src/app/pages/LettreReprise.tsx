@@ -631,7 +631,6 @@ export function LettreReprise() {
                       lineHeight: '1.7',
                       color: '#1e293b',
                     }}
-                    // eslint-disable-next-line react/no-danger
                     dangerouslySetInnerHTML={{ __html: mergedHtml }}
                   />
                 )}
@@ -670,7 +669,6 @@ export function LettreReprise() {
 
             <div
               className="rounded-lg border border-slate-200 overflow-hidden"
-              // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: emailBodyHtml }}
             />
           </div>

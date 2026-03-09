@@ -28,7 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   type Prospect, type ProspectSource, type ProspectDirigeant,
   searchProspects,
@@ -2649,7 +2649,7 @@ function ProspectTimeline({
       const logDate = bracketMatch
         ? (() => {
             // parse "DD/MM/YYYY, HH:MM:SS" locale format
-            const parts = bracketMatch[1].split(/[\s,\/]+/);
+            const parts = bracketMatch[1].split(/[\s,/]+/);
             if (parts.length >= 5) {
               const [d, m, y, h, min] = parts;
               const dd = Number(d), mm = Number(m), yyyy = Number(y), hh = Number(h), mi = Number(min);
