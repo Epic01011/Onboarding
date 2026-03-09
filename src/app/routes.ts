@@ -165,6 +165,13 @@ export const router = createBrowserRouter([
           return { Component: ActionCenter };
         },
       },
+      {
+        path: "email-engine",
+        lazy: async () => {
+          const { EmailEnginePage } = await import('./pages/EmailEnginePage');
+          return { Component: EmailEnginePage };
+        },
+      },
     ],
   },
   // Public route — client portal (magic link)

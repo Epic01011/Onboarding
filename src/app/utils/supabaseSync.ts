@@ -1330,6 +1330,25 @@ export async function getSentEmails(): Promise<{
   }
 }
 
+/**
+ * Deletes one or more sent email records for the current user by their IDs.
+ * Returns a SyncResult (never throws).
+ */
+export async function deleteEmailRecords(ids: string[]): Promise<SyncResult> {
+  if (ids.length === 0) return { success: true };
+  try {
+    const { error } = await supabase
+      .from('sent_emails')
+      .delete()
+      .in('id', ids);
+    if (error) throw error;
+    return { success: true };
+  } catch (err: unknown) {
+    console.warn('[supabaseSync] deleteEmailRecords:', err instanceof Error ? err.message : err);
+    return { success: false, error: err instanceof Error ? err.message : 'Erreur inconnue' };
+  }
+}
+
 // ─── ProspectQuote (quotes listed in the prospect detail view) ────────────────
 
 export interface ProspectQuote {
