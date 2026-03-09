@@ -126,8 +126,8 @@ export function ActionCenter() {
     // Updating the dossier resets updatedAt to now, pushing it out of the overdue window for 3 days
     saveDossier({ ...item.dossier });
     setDismissedIds(prev => new Set([...prev, item.dossier.id]));
-    toast.info(`${getClientName(item.dossier)} reporté à demain`, {
-      description: 'Le dossier réapparaîtra dans 3 jours si aucune mise à jour.',
+    toast.info(`${getClientName(item.dossier)} reporté de 3 jours`, {
+      description: 'Le dossier réapparaîtra dans 3 jours si aucune nouvelle mise à jour.',
     });
   }, [saveDossier]);
 
@@ -140,7 +140,11 @@ export function ActionCenter() {
 
   // ── Bulk send ───────────────────────────────────────────────────────────────
   const handleBulkSend = useCallback(async () => {
-    const ids = [...selected].slice(0, BULK_MAIL_LIMIT);
+    // Preserve display order by filtering items (already sorted by financial risk)
+    const ids = items
+      .filter(i => selected.has(i.dossier.id))
+      .map(i => i.dossier.id)
+      .slice(0, BULK_MAIL_LIMIT);
     if (ids.length === 0) return;
     setIsSendingBulk(true);
     // Simulate async send (replace with real API call as needed)
@@ -383,7 +387,7 @@ export function ActionCenter() {
             <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-gray-400">
               <span className="flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                Overdue — sans mise à jour depuis &gt; 7 jours
+                Overdue — sans mise à jour depuis plus de 7 jours
               </span>
               <span className="flex items-center gap-1.5">
                 <Bell className="w-3.5 h-3.5 text-amber-400" />
