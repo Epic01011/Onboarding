@@ -158,6 +158,13 @@ export const router = createBrowserRouter([
           return { Component: EventsCampaign };
         },
       },
+      {
+        path: "action-center",
+        lazy: async () => {
+          const { ActionCenter } = await import('./pages/ActionCenter');
+          return { Component: ActionCenter };
+        },
+      },
     ],
   },
   // Public route — client portal (magic link)
