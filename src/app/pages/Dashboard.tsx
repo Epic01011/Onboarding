@@ -26,7 +26,7 @@ export function Dashboard() {
   const { dossiers, createDossier, saveDossier, removeDossier } = useDossiersContext();
   const { connections } = useServices();
   const [activeFilter, setActiveFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
-  const [creatingDossier, setCreatingDossier] = useState(false);
+  const [, setCreatingDossier] = useState(false);
 
   // ── Signed clients (propositions SIGNED) ────────────────────────────────
   const [signedClients, setSignedClients] = useState<SignedClient[]>([]);
@@ -53,7 +53,6 @@ export function Dashboard() {
   const handleCreateNew = async (missionType: MissionType) => {
     if (!missionType) return;
     setCreatingDossier(true);
-    setShowMissionModal(false);
     try {
       const newDossier = await createDossier();
       await saveDossier({

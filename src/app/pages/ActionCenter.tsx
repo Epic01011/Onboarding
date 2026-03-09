@@ -97,7 +97,11 @@ export function ActionCenter() {
   const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }, []);
@@ -155,7 +159,7 @@ export function ActionCenter() {
       description: 'Les brouillons ont été soumis depuis votre Inbox IA.',
       action: { label: 'Voir Inbox IA', onClick: () => navigate('/inbox-ia') },
     });
-  }, [selected, navigate]);
+  }, [selected, items, navigate]);
 
   // ─── Render ──────────────────────────────────────────────────────────────
   const overdueCount = items.filter(i => i.riskLevel === 'overdue').length;

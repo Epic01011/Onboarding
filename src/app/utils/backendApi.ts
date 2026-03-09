@@ -303,7 +303,7 @@ export async function getDossiersBackend(token: string, userId: string) {
   }
 
   try {
-    const remote = await kvGet(dbKey);
+    const remote = await kvGet(dbKey, token, userId);
     if (Array.isArray(remote) && remote.length > 0) {
       lsSet(localKey, remote);
       return { dossiers: remote as unknown[] };
