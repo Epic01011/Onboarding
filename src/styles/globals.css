@@ -1,0 +1,14 @@
+/* globals.css responsive fixes */
+
+/* Mobile-first */
+@media (max-width: 640px) {
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .header-compact { @apply px-4 py-2.5 gap-1.5; }
+  .btn-sm { @apply px-2.5 py-1.5 text-xs; }
+}
+
+/* Fix iOS Safari */
+html { -webkit-text-size-adjust: 100%; }
+
+/* Print */
+@media print { .no-print { display: none !important; } }
