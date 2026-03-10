@@ -28,7 +28,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '../components/ui/accordion';
+import { ScrollArea } from '../components/ui/scroll-area';
 import {
   type Prospect, type ProspectSource, type ProspectDirigeant,
   searchProspects,
@@ -47,6 +52,27 @@ import { getQuotesByProspect, generateQuoteAcceptToken, type ProspectQuote } fro
 import { sendEmail } from '../services/emailService';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
+
+/** Shape of the JSONB `quote_data` stored in the `quotes` table. */
+interface QuoteDataShape {
+  legalForm?: string;
+  revenueRange?: string;
+  taxRegime?: string;
+  digitalization?: string;
+  bilanCompris?: boolean;
+  rdvAtterrissage?: boolean;
+  bulletinsPerMonth?: number;
+  monthlyAccountingPrice?: number;
+  monthlyClosurePrice?: number;
+  monthlySocialPrice?: number;
+  monthlyOptionsPrice?: number;
+  options?: {
+    ticketsSupport5an?: boolean;
+    whatsappDedie?: boolean;
+    appelsPrioritaires?: boolean;
+    assembleGenerale?: boolean;
+  };
+}
 
 type LeadStatus = 'nouveau' | 'contacte' | 'interesse' | 'non-interesse';
 type LeadEntry  = Prospect & {
@@ -2147,10 +2173,10 @@ export function Prospection() {
                   </section>
                 )}
 
-                {/* Devis liés au prospect */}
+                {/* Historique des propositions */}
                 <section className="px-6 py-5 space-y-3 border-b border-gray-100">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" /> Devis
+                    <FileText className="w-3.5 h-3.5" /> Historique des propositions
                   </h3>
                   {quotesLoading ? (
                     <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -2159,54 +2185,120 @@ export function Prospection() {
                   ) : (quotesMap[sheetId ?? ''] ?? []).length === 0 ? (
                     <p className="text-xs text-gray-400 italic">Aucun devis généré pour ce prospect.</p>
                   ) : (
-                    <div className="overflow-x-auto -mx-6 px-6">
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-gray-100">
-                            <th className="text-left py-2 pr-3 font-semibold text-gray-500">Version</th>
-                            <th className="text-left py-2 pr-3 font-semibold text-gray-500">Statut</th>
-                            <th className="text-right py-2 pr-3 font-semibold text-gray-500">Mensuel HT</th>
-                            <th className="text-right py-2 pr-3 font-semibold text-gray-500">Démarrage</th>
-                            <th className="py-2 font-semibold text-gray-500">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(quotesMap[sheetId ?? ''] ?? []).map(q => {
-                            const statusLabel: Record<string, string> = {
-                              DRAFT: 'Brouillon',
-                              SENT: 'Envoyé',
-                              ACCEPTED: 'Accepté',
-                              VALIDATED: 'Validé',
-                              SIGNED: 'Signé',
-                              PENDING_ONBOARDING: 'En attente',
-                              ARCHIVED: 'Archivé',
-                            };
-                            const statusColor: Record<string, string> = {
-                              DRAFT: 'bg-gray-100 text-gray-600',
-                              SENT: 'bg-blue-100 text-blue-700',
-                              ACCEPTED: 'bg-emerald-100 text-emerald-700',
-                              VALIDATED: 'bg-green-100 text-green-700',
-                              SIGNED: 'bg-violet-100 text-violet-700',
-                              PENDING_ONBOARDING: 'bg-amber-100 text-amber-700',
-                              ARCHIVED: 'bg-gray-100 text-gray-500',
-                            };
-                            const canSend = q.status !== 'ACCEPTED' && q.status !== 'VALIDATED' && q.status !== 'SIGNED';
-                            return (
-                              <tr key={q.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                                <td className="py-2 pr-3 font-semibold text-gray-800">v{q.version}</td>
-                                <td className="py-2 pr-3">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${statusColor[q.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                    {statusLabel[q.status] ?? q.status}
-                                  </span>
-                                </td>
-                                <td className="py-2 pr-3 text-right font-medium text-gray-900">
-                                  {q.monthlyTotal.toFixed(2).replace('.', ',')} €
-                                </td>
-                                <td className="py-2 pr-3 text-right text-gray-600">
-                                  {q.setupFees > 0 ? `${q.setupFees.toFixed(2).replace('.', ',')} €` : '—'}
-                                </td>
-                                <td className="py-2">
-                                  {canSend && (
+                    <ScrollArea className="max-h-[500px] pr-1">
+                      <Accordion type="single" collapsible className="space-y-2">
+                        {(quotesMap[sheetId ?? ''] ?? []).map(q => {
+                          const statusLabel: Record<string, string> = {
+                            DRAFT: 'Brouillon',
+                            SENT: 'Envoyé',
+                            ACCEPTED: 'Accepté',
+                            VALIDATED: 'Validé',
+                            SIGNED: 'Signé',
+                            PENDING_ONBOARDING: 'En attente',
+                            ARCHIVED: 'Archivé',
+                          };
+                          const statusBadgeClass: Record<string, string> = {
+                            DRAFT: 'bg-gray-100 text-gray-600 hover:bg-gray-100 border-0',
+                            SENT: 'bg-blue-100 text-blue-700 hover:bg-blue-100 border-0',
+                            ACCEPTED: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0',
+                            VALIDATED: 'bg-green-100 text-green-700 hover:bg-green-100 border-0',
+                            SIGNED: 'bg-violet-100 text-violet-700 hover:bg-violet-100 border-0',
+                            PENDING_ONBOARDING: 'bg-amber-100 text-amber-700 hover:bg-amber-100 border-0',
+                            ARCHIVED: 'bg-gray-100 text-gray-500 hover:bg-gray-100 border-0',
+                          };
+                          const canSend = q.status !== 'ACCEPTED' && q.status !== 'VALIDATED' && q.status !== 'SIGNED';
+                          const qd = q.quoteData as QuoteDataShape;
+                          const opts = qd.options ?? {};
+                          return (
+                            <AccordionItem
+                              key={q.id}
+                              value={q.id}
+                              className="rounded-lg border border-gray-200 bg-white overflow-hidden"
+                            >
+                              {/* Summary trigger */}
+                              <AccordionTrigger className="px-3 py-2.5 hover:no-underline hover:bg-gray-50/50 [&[data-state=open]]:bg-gray-50/50 transition-colors">
+                                <div className="flex items-center justify-between w-full gap-2 pr-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-semibold text-gray-800">v{q.version}</span>
+                                    <Badge className={statusBadgeClass[q.status] ?? 'bg-gray-100 text-gray-600 hover:bg-gray-100 border-0'}>
+                                      {statusLabel[q.status] ?? q.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-right flex-shrink-0">
+                                    <span className="text-xs font-semibold text-gray-900">{q.monthlyTotal.toFixed(2).replace('.', ',')} €<span className="text-[10px] font-normal text-gray-400">/mois</span></span>
+                                    <span className="text-[10px] text-gray-400">{new Date(q.createdAt).toLocaleDateString('fr-FR')}</span>
+                                  </div>
+                                </div>
+                              </AccordionTrigger>
+
+                              {/* Detail content */}
+                              <AccordionContent className="px-3 pb-3">
+                                {/* Context */}
+                                {(qd.legalForm || qd.revenueRange || qd.taxRegime) && (
+                                  <p className="text-[11px] text-gray-500 mb-2">
+                                    {[qd.legalForm, qd.revenueRange, qd.taxRegime, qd.digitalization === 'numerique' ? '100% numérisé' : qd.digitalization === 'papier' ? 'Papier' : undefined].filter(Boolean).join(' · ')}
+                                  </p>
+                                )}
+
+                                {/* Pricing breakdown */}
+                                <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                  {qd.monthlyAccountingPrice != null && qd.monthlyAccountingPrice > 0 && (
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <p className="text-[10px] text-gray-500">Tenue compta</p>
+                                      <p className="text-xs font-semibold text-gray-800">{qd.monthlyAccountingPrice.toFixed(2).replace('.', ',')} €</p>
+                                    </div>
+                                  )}
+                                  {qd.monthlyClosurePrice != null && qd.monthlyClosurePrice > 0 && (
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <p className="text-[10px] text-gray-500">Clôture</p>
+                                      <p className="text-xs font-semibold text-gray-800">{qd.monthlyClosurePrice.toFixed(2).replace('.', ',')} €</p>
+                                    </div>
+                                  )}
+                                  {qd.monthlySocialPrice != null && qd.monthlySocialPrice > 0 && (
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <p className="text-[10px] text-gray-500">Social</p>
+                                      <p className="text-xs font-semibold text-gray-800">{qd.monthlySocialPrice.toFixed(2).replace('.', ',')} €</p>
+                                    </div>
+                                  )}
+                                  {qd.monthlyOptionsPrice != null && qd.monthlyOptionsPrice > 0 && (
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <p className="text-[10px] text-gray-500">Options</p>
+                                      <p className="text-xs font-semibold text-gray-800">{qd.monthlyOptionsPrice.toFixed(2).replace('.', ',')} €</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="bg-blue-50 rounded p-2 mb-2 flex items-center justify-between">
+                                  <span className="text-[10px] text-blue-600 font-medium">Total mensuel HT</span>
+                                  <span className="text-xs font-bold text-blue-700">{q.monthlyTotal.toFixed(2).replace('.', ',')} €</span>
+                                </div>
+                                {q.setupFees > 0 && (
+                                  <div className="bg-amber-50 rounded p-2 mb-2 flex items-center justify-between">
+                                    <span className="text-[10px] text-amber-600 font-medium">Frais de démarrage</span>
+                                    <span className="text-xs font-bold text-amber-700">{q.setupFees.toFixed(2).replace('.', ',')} €</span>
+                                  </div>
+                                )}
+
+                                {/* Services & options */}
+                                {(qd.bilanCompris || qd.rdvAtterrissage || (qd.bulletinsPerMonth != null && qd.bulletinsPerMonth > 0) || opts.ticketsSupport5an || opts.whatsappDedie || opts.appelsPrioritaires || opts.assembleGenerale) && (
+                                  <div className="mt-2">
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Services inclus</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {qd.bulletinsPerMonth != null && qd.bulletinsPerMonth > 0 && (
+                                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">{qd.bulletinsPerMonth} bulletin{qd.bulletinsPerMonth > 1 ? 's' : ''}/mois</span>
+                                      )}
+                                      {qd.bilanCompris && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">RDV bilan</span>}
+                                      {qd.rdvAtterrissage && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">RDV atterrissage</span>}
+                                      {opts.ticketsSupport5an && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">5 tickets support/an</span>}
+                                      {opts.whatsappDedie && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">WhatsApp dédié</span>}
+                                      {opts.appelsPrioritaires && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">Appels prioritaires</span>}
+                                      {opts.assembleGenerale && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">Assemblée générale</span>}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Action */}
+                                {canSend && (
+                                  <div className="mt-3 pt-2 border-t border-gray-100">
                                     <button
                                       onClick={() => handleSendQuote(q)}
                                       disabled={sendingQuoteId === q.id}
@@ -2214,20 +2306,17 @@ export function Prospection() {
                                     >
                                       {sendingQuoteId === q.id
                                         ? <><Loader2 className="w-3 h-3 animate-spin" /> Envoi…</>
-                                        : <><Send className="w-3 h-3" /> Envoyer</>
+                                        : <><Send className="w-3 h-3" /> Envoyer au prospect</>
                                       }
                                     </button>
-                                  )}
-                                  {!canSend && (
-                                    <span className="text-[11px] text-gray-400 italic">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                  </div>
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
+                    </ScrollArea>
                   )}
                 </section>
 

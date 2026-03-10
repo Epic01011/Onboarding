@@ -1359,6 +1359,7 @@ export interface ProspectQuote {
   setupFees: number;
   createdAt: string;
   acceptToken: string | null;
+  quoteData: Record<string, unknown>;
 }
 
 /**
@@ -1374,7 +1375,7 @@ export async function getQuotesByProspect(
   try {
     const { data, error } = await supabase
       .from('quotes')
-      .select('id, version, status, monthly_total, setup_fees, created_at, accept_token')
+      .select('id, version, status, monthly_total, setup_fees, created_at, accept_token, quote_data')
       .eq('prospect_id', prospectId)
       .order('version', { ascending: false });
 
@@ -1391,6 +1392,7 @@ export async function getQuotesByProspect(
       setupFees: (row.setup_fees as number) ?? 0,
       createdAt: row.created_at as string,
       acceptToken: (row.accept_token as string | null) ?? null,
+      quoteData: (row.quote_data as Record<string, unknown>) ?? {},
     }));
 
     return { success: true, quotes };
