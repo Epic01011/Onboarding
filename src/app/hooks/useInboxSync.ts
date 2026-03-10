@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMicrosoftAuth } from '../context/MicrosoftAuthContext';
 import { useCabinet } from '../context/CabinetContext';
 import { useEmailDraftStore } from '../../components/ai-assistant/useEmailDraftStore';
-import { AIEmailDraft } from '../../components/ai-assistant/types';
+import { AIEmailDraft, SystemPromptConfig } from '../../components/ai-assistant/types';
 import { fetchClientEmails, sendEmailViaGraph } from '../utils/microsoftGraph';
 import { generateEmailDraft, AiGenerationError } from '../services/aiEmailGenerator';
 import { supabase } from '../utils/supabaseClient';
@@ -53,7 +53,7 @@ function classifyGraphError(err: unknown): GraphErrorKind {
 
 export interface UseInboxSyncReturn {
   /** Fetch new client emails, generate AI drafts, add them to the draft store. */
-  fetchInboxDrafts: () => Promise<void>;
+  fetchInboxDrafts: (systemPrompts?: SystemPromptConfig) => Promise<void>;
   /** Send an approved draft via Microsoft Graph and mark it as sent. */
   sendApprovedDraft: (id: string) => Promise<void>;
 }
@@ -74,7 +74,7 @@ export function useInboxSync(): UseInboxSyncReturn {
 
   // ── fetchInboxDrafts ────────────────────────────────────────────────────────
 
-  const fetchInboxDrafts = useCallback(async () => {
+  const fetchInboxDrafts = useCallback(async (systemPrompts?: SystemPromptConfig) => {
     if (!graphToken) {
       toast.error('Connexion Microsoft requise pour récupérer les emails.');
       return;
@@ -86,20 +86,24 @@ export function useInboxSync(): UseInboxSyncReturn {
       //    Falls back to empty string if no key is stored or decryption fails
       //    (e.g. legacy plaintext rows → user must re-save from the Settings page).
       let decryptedApiKey = '';
-      let settingsAiProvider: 'claude' | 'openai' | null = null;
+      let decryptedPerplexityKey = '';
+      let settingsAiProvider: 'claude' | 'openai' | 'perplexity' | null = null;
       if (user) {
         try {
           const { data: settings } = await supabase
             .from('cabinet_settings')
-            .select('ai_api_key,ai_provider')
+            .select('ai_api_key,perplexity_api_key,ai_provider')
             .eq('user_id', user.id)
             .maybeSingle();
 
           if (settings?.ai_api_key) {
             decryptedApiKey = await decryptApiKey(settings.ai_api_key, user.id);
           }
+          if (settings?.perplexity_api_key) {
+            decryptedPerplexityKey = await decryptApiKey(settings.perplexity_api_key, user.id);
+          }
           // Inherit ai_provider from cabinet_settings when available
-          if (settings?.ai_provider === 'claude' || settings?.ai_provider === 'openai') {
+          if (settings?.ai_provider === 'claude' || settings?.ai_provider === 'openai' || settings?.ai_provider === 'perplexity') {
             settingsAiProvider = settings.ai_provider;
           }
         } catch (settingsErr) {
@@ -107,14 +111,22 @@ export function useInboxSync(): UseInboxSyncReturn {
         }
       }
 
-      // Merge the decrypted key (and optional provider override) with the rest of cabinet info.
-      // CabinetContext holds cabinet name/expert/logo; the encrypted key from
-      // cabinet_settings overrides any stale CabinetContext value.
+      // Merge the decrypted keys (and optional provider override) with the rest of cabinet info.
+      // CabinetContext holds cabinet name/expert/logo; the encrypted keys from
+      // cabinet_settings override any stale CabinetContext value.
       const cabinetWithKey = {
         ...cabinet,
         aiApiKey: decryptedApiKey || cabinet.aiApiKey || '',
+        perplexityApiKey: decryptedPerplexityKey || cabinet.perplexityApiKey || '',
         ...(settingsAiProvider ? { aiProvider: settingsAiProvider } : {}),
       };
+
+      // Resolve the pre-instruction to send to the AI based on the selected provider.
+      // Each provider can have its own customizable instruction configured in Inbox IA.
+      // activeProvider is typed as AiProvider = 'claude' | 'openai' | 'perplexity',
+      // which matches keyof SystemPromptConfig exactly, so direct indexing is type-safe.
+      const activeProvider = cabinetWithKey.aiProvider ?? 'claude';
+      const preInstruction = systemPrompts?.[activeProvider]?.trim() || undefined;
 
       // 2. Fetch unread emails from Microsoft Graph.
       let clientEmails;
@@ -158,6 +170,7 @@ export function useInboxSync(): UseInboxSyncReturn {
           const generated = await generateEmailDraft({
             clientEmail: email,
             cabinetInfo: cabinetWithKey,
+            preInstruction,
           });
           const now = new Date().toISOString();
           newDrafts.push({

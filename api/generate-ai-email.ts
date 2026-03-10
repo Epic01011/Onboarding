@@ -167,7 +167,7 @@ async function callOpenAI(
 
 // ─── Perplexity ──────────────────────────────────────────────────────────────
 
-async function _callPerplexity(
+async function callPerplexity(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
@@ -289,6 +289,8 @@ export default async function handler(
     let content: string;
     if (provider === 'claude') {
       content = await callClaude(apiKey, enrichedSystem, enrichedUser, model ?? 'claude-3-5-sonnet-20241022', tokens);
+    } else if (provider === 'perplexity') {
+      content = await callPerplexity(apiKey, enrichedSystem, enrichedUser, model ?? 'sonar-pro', tokens);
     } else {
       content = await callOpenAI(apiKey, enrichedSystem, enrichedUser, model ?? 'gpt-4o-mini', tokens);
     }
