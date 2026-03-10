@@ -917,6 +917,8 @@ export function SettingsPage() {
         expertNom: (values.expert_name ?? '').trim(),
         cabinetLogoUrl: (values.logo_url ?? '').trim() || undefined,
         aiProvider: normalizedProvider,
+        aiApiKey: encryptedKey ?? undefined,
+        perplexityApiKey: encryptedPerplexityKey ?? undefined,
         siren: (values.siren ?? '').trim(),
         adresse: (values.adresse ?? '').trim(),
         codePostal: (values.code_postal ?? '').trim(),
