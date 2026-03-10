@@ -20,6 +20,7 @@ const DEFAULT_SYSTEM_PROMPTS: SystemPromptConfig = {
   fiscal: "Tu es un expert-comptable fiscaliste. Rédige des réponses précises, professionnelles et fondées sur le droit fiscal français (CGI, BOFiP). Cite les articles applicables.",
   social: "Tu es un expert-comptable spécialisé en droit social. Rédige des réponses claires sur les cotisations, contrats et obligations sociales, en référençant le Code du travail et l'URSSAF.",
   relance: "Tu es un expert-comptable rédacteur de relances professionnelles. Formule des relances courtois mais fermes, adaptées au contexte (factures impayées, documents manquants, délais).",
+  perplexity: "Tu es un assistant IA avec accès à des recherches web en temps réel. Utilise tes capacités de recherche pour fournir des informations fiscales et comptables à jour, en citant les sources et textes réglementaires les plus récents (BOFiP, CGI, jurisprudence). Vérifie toujours l'actualité des références mentionnées.",
 };
 
 const LOCAL_STORAGE_PROMPTS_KEY = 'inbox_ia_system_prompts';
@@ -280,6 +281,7 @@ function SystemPromptPanel({
     { key: 'fiscal', label: 'Fiscale', labelClass: 'text-blue-700', borderClass: 'border-blue-200', ringClass: 'focus:ring-blue-300', bgClass: 'bg-blue-50/30' },
     { key: 'social', label: 'Sociale', labelClass: 'text-green-700', borderClass: 'border-green-200', ringClass: 'focus:ring-green-300', bgClass: 'bg-green-50/30' },
     { key: 'relance', label: 'Relance', labelClass: 'text-amber-700', borderClass: 'border-amber-200', ringClass: 'focus:ring-amber-300', bgClass: 'bg-amber-50/30' },
+    { key: 'perplexity', label: 'Perplexity AI (recherche web)', labelClass: 'text-purple-700', borderClass: 'border-purple-200', ringClass: 'focus:ring-purple-300', bgClass: 'bg-purple-50/30' },
   ];
 
   return (
@@ -303,7 +305,7 @@ function SystemPromptPanel({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           <p className="text-xs text-gray-500">
             Ces instructions sont ajoutées en tête du prompt système lors de la génération IA.
-            Personnalisez-les selon les pratiques de votre cabinet.
+            Personnalisez-les selon les pratiques de votre cabinet. La section <span className="font-medium text-purple-700">Perplexity AI</span> s'applique uniquement quand ce fournisseur est sélectionné dans les paramètres.
           </p>
           {categories.map(({ key, label, labelClass, borderClass, ringClass, bgClass }) => (
             <div key={key}>
@@ -895,7 +897,7 @@ export function InboxIA() {
 
   const handleRefresh = () => {
     if (graphToken) {
-      void fetchInboxDrafts();
+      void fetchInboxDrafts(systemPrompts);
     }
   };
 

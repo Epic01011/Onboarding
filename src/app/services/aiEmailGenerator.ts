@@ -19,6 +19,8 @@ import { CabinetInfo } from '../utils/servicesStorage';
 export interface GenerateEmailOptions {
   clientEmail: ClientEmail;
   cabinetInfo: CabinetInfo;
+  /** Optional pre-instruction prepended to the system prompt (e.g. from Inbox IA configuration). */
+  preInstruction?: string;
 }
 
 export interface GeneratedDraft {
@@ -119,6 +121,7 @@ async function callAiApi(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
+  preInstruction?: string,
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), AI_CALL_TIMEOUT_MS);
@@ -127,7 +130,7 @@ async function callAiApi(
     const response = await fetch('/api/generate-ai-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey, systemPrompt, userPrompt }),
+      body: JSON.stringify({ provider, apiKey, systemPrompt, userPrompt, preInstruction }),
       signal: controller.signal,
     });
 
@@ -168,7 +171,7 @@ async function callAiApi(
 export async function generateEmailDraft(
   options: GenerateEmailOptions,
 ): Promise<GeneratedDraft> {
-  const { clientEmail, cabinetInfo } = options;
+  const { clientEmail, cabinetInfo, preInstruction } = options;
   const provider = cabinetInfo.aiProvider ?? 'claude';
   // Use the Perplexity key when Perplexity is selected, otherwise the main AI key
   const apiKey = provider === 'perplexity'
@@ -195,7 +198,7 @@ export async function generateEmailDraft(
   const systemPrompt = buildSystemPrompt(cabinetInfo);
   const userPrompt = buildUserPrompt(clientEmail);
 
-  const aiContent = await callAiApi(provider, apiKey, systemPrompt, userPrompt);
+  const aiContent = await callAiApi(provider, apiKey, systemPrompt, userPrompt, preInstruction);
   const htmlBody = aiContent + buildSignatureHtml(cabinetInfo);
 
   // Derive plain text: sanitize HTML first, then extract text content via DOM parsing

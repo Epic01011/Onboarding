@@ -8,6 +8,8 @@ export interface SystemPromptConfig {
   fiscal: string;
   social: string;
   relance: string;
+  /** Pre-instruction spécifique à Perplexity AI (recherche web en temps réel). */
+  perplexity: string;
 }
 
 export interface BofipSource {
