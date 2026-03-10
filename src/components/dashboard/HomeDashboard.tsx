@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, X, BookOpen, Handshake, FolderKanban,
-  HardDrive, Send, Zap,
+  HardDrive, Send, Zap, ChevronRight,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -198,13 +198,11 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 bg-slate-50 rounded-3xl p-6">
       {/* ── Page Header ──────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Bonjour, voici votre espace de travail
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Tour de Contrôle</h1>
           <p className="text-sm text-muted-foreground mt-1 capitalize">{TODAY}</p>
         </div>
         <button
@@ -217,273 +215,490 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </button>
       </div>
 
-      {/* ── Tools Grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {/* 1. Moteur de Pricing */}
-        <button
-          onClick={() => navigate('/pricing')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calculator className="w-5 h-5 text-violet-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Pricing</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Calculer les honoraires</p>
-          </div>
-        </button>
+      {/* ── Main Layout: Left 1/4 + Right 3/4 ───────────────────────── */}
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
 
-        {/* 2. Moteur de LDM */}
-        <button
-          onClick={() => navigate('/lettre-mission')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            validatedQuotesCount > 0
-              ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
-              : 'bg-white border-slate-200/60 hover:border-emerald-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            validatedQuotesCount > 0 ? 'bg-emerald-100' : 'bg-emerald-50'
-          }`}>
-            <Cog className={`w-5 h-5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-emerald-500'}`} />
+        {/* ══════════════════════════════════════════════════════════════
+            LEFT PANEL — Flux de Signature (1/4)
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="w-full lg:w-64 lg:flex-shrink-0 flex flex-col">
+          <div className="mb-3">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              Flux de Signature
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Pipeline client</p>
           </div>
-          <div>
-            <p className={`font-semibold text-sm ${validatedQuotesCount > 0 ? 'text-emerald-800' : 'text-gray-900'}`}>
-              Moteur LDM
-            </p>
-            <p className={`text-xs mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-              {validatedQuotesCount > 0
-                ? `${validatedQuotesCount} proposition${validatedQuotesCount > 1 ? 's' : ''} validée${validatedQuotesCount > 1 ? 's' : ''} à traiter`
-                : 'Lettres de mission'}
-            </p>
-          </div>
-        </button>
 
-        {/* 3. Moteur de Reprise Confraternelle */}
-        <button
-          onClick={() => navigate('/lettre-reprise')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-amber-200"
-        >
-          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Handshake className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de reprise confraternelle</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Lettres confraternelles</p>
-          </div>
-        </button>
-
-        {/* 4. Moteur de Prospection */}
-        <button
-          onClick={() => navigate('/prospection')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Radar className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Prospection</p>
-            <p className="text-xs text-muted-foreground mt-0.5">CRM & relances</p>
-          </div>
-        </button>
-
-        {/* 5. Inbox IA */}
-        <button
-          onClick={() => navigate('/inbox-ia')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            kpis.aiPending > 0
-              ? 'bg-purple-50 border-purple-200 hover:border-purple-300'
-              : 'bg-white border-slate-200/60 hover:border-purple-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
-          }`}>
-            <Mail className={`w-5 h-5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-500'}`} />
-          </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.aiPending > 0 ? 'text-purple-800' : 'text-gray-900'}`}>
-              Inbox IA
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-muted-foreground'}`}>
-              {kpis.aiPending > 0
-                ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
-                : 'Emails & brouillons IA'}
-            </p>
-          </div>
-        </button>
-
-        {/* 6. Centre d'action unifié */}
-        <button
-          onClick={() => navigate('/action-center')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            kpis.overdues > 0
-              ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
-              : 'bg-white border-slate-200/60 hover:border-violet-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
-          }`}>
-            <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
-          </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
-              Centre d'action
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-muted-foreground'}`}>
-              {kpis.overdues > 0
-                ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
-                : 'Relances & tâches unifiées'}
-            </p>
-          </div>
-        </button>
-      </div>
-
-      {/* ── KPI Cards ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Devis envoyés */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200/60 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-blue-700 font-medium">Devis envoyés</p>
-            <div className="w-9 h-9 bg-blue-500 rounded-xl flex items-center justify-center">
-              <Send className="w-5 h-5 text-white" />
+          {/* Step 1 — Prospection */}
+          <button
+            onClick={() => navigate('/prospection')}
+            className="w-full flex flex-col gap-3 bg-white border border-slate-200 rounded-2xl p-5 text-left hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 transition-all duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Radar className="w-7 h-7 text-blue-600" />
+              </div>
+              {sentQuotesCount > 0 && (
+                <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                  {sentQuotesCount}
+                </span>
+              )}
             </div>
+            <div>
+              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Étape 1</span>
+              <p className="font-bold text-gray-900 mt-0.5">Prospection</p>
+              <p className="text-xs text-slate-400 mt-0.5">CRM & relances</p>
+            </div>
+          </button>
+
+          <div className="flex justify-center py-1.5" aria-hidden="true">
+            <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
           </div>
-          <p className="text-3xl font-bold text-blue-900">
-            {sentQuotesMrr >= 1000
-              ? `${(sentQuotesMrr / 1000).toFixed(0)}k€`
-              : `${sentQuotesMrr.toLocaleString('fr-FR')} €`}
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            {sentQuotesCount} devis · MRR envoyé
-          </p>
+
+          {/* Step 2 — Pricing */}
+          <button
+            onClick={() => navigate('/pricing')}
+            className="w-full flex flex-col gap-3 bg-white border border-slate-200 rounded-2xl p-5 text-left hover:shadow-md hover:border-violet-300 hover:-translate-y-0.5 transition-all duration-200"
+          >
+            <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center">
+              <Calculator className="w-7 h-7 text-violet-600" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Étape 2</span>
+              <p className="font-bold text-gray-900 mt-0.5">Pricing</p>
+              <p className="text-xs text-slate-400 mt-0.5">Calcul des honoraires</p>
+            </div>
+          </button>
+
+          <div className="flex justify-center py-1.5" aria-hidden="true">
+            <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
+          </div>
+
+          {/* Step 3 — LDM */}
+          <button
+            onClick={() => navigate('/lettre-mission')}
+            className={`w-full flex flex-col gap-3 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border ${
+              validatedQuotesCount > 0
+                ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400'
+                : 'bg-white border-slate-200 hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                validatedQuotesCount > 0 ? 'bg-emerald-100' : 'bg-emerald-50'
+              }`}>
+                <Cog className={`w-7 h-7 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-emerald-500'}`} />
+              </div>
+              {validatedQuotesCount > 0 && (
+                <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                  {validatedQuotesCount}
+                </span>
+              )}
+            </div>
+            <div>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                validatedQuotesCount > 0 ? 'text-emerald-500' : 'text-emerald-400'
+              }`}>Étape 3</span>
+              <p className={`font-bold mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-900' : 'text-gray-900'}`}>
+                LDM
+              </p>
+              <p className={`text-xs mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {validatedQuotesCount > 0
+                  ? `${validatedQuotesCount} à traiter`
+                  : 'Lettres de mission'}
+              </p>
+            </div>
+          </button>
+
+          <div className="flex justify-center py-1.5" aria-hidden="true">
+            <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
+          </div>
+
+          {/* Step 4 — Onboarding */}
+          <button
+            onClick={() => setShowNewDossierModal(true)}
+            disabled={creatingDossier}
+            className="w-full flex flex-col gap-3 bg-white border border-slate-200 rounded-2xl p-5 text-left hover:shadow-md hover:border-indigo-300 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-60"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <FolderKanban className="w-7 h-7 text-indigo-600" />
+              </div>
+              {kpis.clientsActifs > 0 && (
+                <span className="bg-indigo-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                  {kpis.clientsActifs}
+                </span>
+              )}
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Étape 4</span>
+              <p className="font-bold text-gray-900 mt-0.5">Onboarding</p>
+              <p className="text-xs text-slate-400 mt-0.5">Créer un dossier</p>
+            </div>
+          </button>
+
+          <div className="flex justify-center py-1.5" aria-hidden="true">
+            <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
+          </div>
+
+          {/* Final — Validation Client (shiny border) */}
+          <button
+            onClick={() => navigate('/dossiers-actifs')}
+            className="w-full flex flex-col gap-3 rounded-2xl p-5 text-left transition-all duration-200 hover:-translate-y-0.5 relative overflow-hidden bg-gradient-to-br from-amber-50 via-white to-emerald-50"
+            style={{
+              border: '2px solid transparent',
+              backgroundClip: 'padding-box',
+              boxShadow: '0 0 0 2px rgba(251,191,36,0.5), 0 0 24px rgba(251,191,36,0.2), 0 4px 20px rgba(0,0,0,0.08)',
+            }}
+          >
+            {/* Animated shimmer strip */}
+            <div
+              className="shimmer-strip absolute inset-0 opacity-20 pointer-events-none"
+              style={{
+                background: 'linear-gradient(105deg, transparent 40%, rgba(251,191,36,0.6) 50%, transparent 60%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2.5s infinite linear',
+              }}
+            />
+            <div className="flex items-center justify-between relative z-10">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-md">
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
+              {signedClients.length > 0 && (
+                <span className="bg-gradient-to-r from-amber-400 to-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center shadow-sm">
+                  {signedClients.length}
+                </span>
+              )}
+            </div>
+            <div className="relative z-10">
+              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Entrée BDD</span>
+              <p className="font-bold text-gray-900 mt-0.5">Validation Client</p>
+              <p className="text-xs text-slate-500 mt-0.5">Finaliser & enregistrer</p>
+            </div>
+          </button>
         </div>
 
-        {/* CA Onboardé */}
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl border border-emerald-200/60 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-emerald-700 font-medium">CA Onboardé</p>
-            <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-white" />
+        {/* ══════════════════════════════════════════════════════════════
+            RIGHT PANEL — Hub Opérationnel (3/4)
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* ── KPI Mini-Cards ─────────────────────────────────────── */}
+          <div className="grid grid-cols-4 gap-3">
+            {/* Devis envoyés */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-blue-700 font-medium">Devis envoyés</p>
+                <Send className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="text-2xl font-bold text-blue-900">
+                {sentQuotesMrr >= 1000
+                  ? `${(sentQuotesMrr / 1000).toFixed(0)}k€`
+                  : `${sentQuotesMrr.toLocaleString('fr-FR')} €`}
+              </p>
+              <p className="text-xs text-blue-600 mt-0.5">{sentQuotesCount} devis · MRR</p>
+            </div>
+
+            {/* CA Onboardé */}
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl border border-emerald-200/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-emerald-700 font-medium">CA Onboardé</p>
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+              </div>
+              <p className="text-2xl font-bold text-emerald-900">
+                {(kpis.caOnboarde / 1000).toFixed(0)}k€
+              </p>
+              <p className="text-xs text-emerald-600 mt-0.5">{signedClients.length} LDM signées</p>
+            </div>
+
+            {/* Clients actifs */}
+            <button
+              onClick={() => navigate('/dossiers-actifs')}
+              className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-200"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-slate-500 font-medium">Clients actifs</p>
+                <Users className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{kpis.clientsActifs}</p>
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                en cours <ArrowRight className="w-3 h-3" />
+              </p>
+            </button>
+
+            {/* Alertes */}
+            <button
+              onClick={() => navigate('/taches-overdue')}
+              className={`rounded-2xl p-4 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border ${
+                kpis.blockers.length > 0
+                  ? 'bg-red-50/60 border-red-200/60 hover:border-red-300'
+                  : 'bg-white border-slate-200/60 hover:border-red-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className={`text-xs font-medium ${kpis.blockers.length > 0 ? 'text-red-600' : 'text-slate-500'}`}>
+                  Alertes
+                </p>
+                <AlertTriangle className={`w-4 h-4 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-slate-400'}`} />
+              </div>
+              <p className={`text-2xl font-bold ${kpis.blockers.length > 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                {kpis.blockers.length}
+              </p>
+              <p className={`text-xs mt-0.5 flex items-center gap-1 ${kpis.blockers.length > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                blocages <ArrowRight className="w-3 h-3" />
+              </p>
+            </button>
+          </div>
+
+          {/* ── Bento Grid ─────────────────────────────────────────── */}
+          <div>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+              Hub Opérationnel
+            </h2>
+            <div className="grid grid-cols-4 gap-3">
+
+              {/* Inbox IA — col-span-2, wider (action rapide) */}
+              <button
+                onClick={() => navigate('/inbox-ia')}
+                className={`col-span-2 flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border relative ${
+                  kpis.aiPending > 0
+                    ? 'bg-purple-50 border-purple-200 hover:border-purple-300'
+                    : 'bg-white border-slate-200/60 hover:border-purple-200'
+                }`}
+              >
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                  kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
+                }`}>
+                  <Mail className={`w-8 h-8 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-bold text-base ${kpis.aiPending > 0 ? 'text-purple-900' : 'text-gray-900'}`}>
+                    Inbox IA
+                  </p>
+                  <p className={`text-sm mt-0.5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-slate-500'}`}>
+                    {kpis.aiPending > 0
+                      ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
+                      : 'Emails & brouillons IA'}
+                  </p>
+                </div>
+                {kpis.aiPending > 0 && (
+                  <span className="absolute top-3 right-3 bg-purple-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
+                    {kpis.aiPending}
+                  </span>
+                )}
+              </button>
+
+              {/* Relances Critiques — col-span-2, wider (action rapide) */}
+              <button
+                onClick={() => navigate('/relances-critiques')}
+                className={`col-span-2 flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border relative ${
+                  kpis.overdues > 0
+                    ? 'bg-orange-50 border-orange-200 hover:border-orange-300'
+                    : 'bg-white border-slate-200/60 hover:border-orange-200'
+                }`}
+              >
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                  kpis.overdues > 0 ? 'bg-orange-100' : 'bg-orange-50'
+                }`}>
+                  <Bell className={`w-8 h-8 ${kpis.overdues > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-bold text-base ${kpis.overdues > 0 ? 'text-orange-900' : 'text-gray-900'}`}>
+                    Relances Critiques
+                  </p>
+                  <p className={`text-sm mt-0.5 ${kpis.overdues > 0 ? 'text-orange-600' : 'text-slate-500'}`}>
+                    {kpis.overdues > 0
+                      ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} en retard`
+                      : 'Suivi des urgences'}
+                  </p>
+                </div>
+                {kpis.overdues > 0 && (
+                  <span className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
+                    {kpis.overdues}
+                  </span>
+                )}
+              </button>
+
+              {/* Calendrier Fiscal */}
+              <button
+                onClick={() => navigate('/fiscal-calendar')}
+                className="col-span-1 flex flex-col gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 transition-all duration-200"
+              >
+                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-7 h-7 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900">Calendrier Fiscal</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Échéances</p>
+                </div>
+              </button>
+
+              {/* GED SharePoint */}
+              <button
+                onClick={() => navigate('/ged')}
+                className="col-span-1 flex flex-col gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-sky-200 transition-all duration-200"
+              >
+                <div className="w-12 h-12 bg-sky-50 rounded-xl flex items-center justify-center">
+                  <HardDrive className="w-7 h-7 text-sky-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900">GED SharePoint</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Documents</p>
+                </div>
+              </button>
+
+              {/* Reprise Confraternelle */}
+              <button
+                onClick={() => navigate('/lettre-reprise')}
+                className="col-span-1 flex flex-col gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 transition-all duration-200"
+              >
+                <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <Handshake className="w-7 h-7 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900">Reprise Confraternelle</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Lettres</p>
+                </div>
+              </button>
+
+              {/* Tâches */}
+              <button
+                onClick={() => navigate('/taches-overdue')}
+                className={`col-span-1 flex flex-col gap-3 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border relative ${
+                  kpis.blockers.length > 0
+                    ? 'bg-red-50/60 border-red-200/60 hover:border-red-300'
+                    : 'bg-white border-slate-200/60 hover:border-red-200'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  kpis.blockers.length > 0 ? 'bg-red-100' : 'bg-red-50'
+                }`}>
+                  <AlertTriangle className={`w-7 h-7 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-red-400'}`} />
+                </div>
+                <div>
+                  <p className={`font-bold text-sm ${kpis.blockers.length > 0 ? 'text-red-800' : 'text-gray-900'}`}>
+                    Tâches
+                  </p>
+                  <p className={`text-xs mt-0.5 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                    {kpis.blockers.length > 0 ? `${kpis.blockers.length} blocage${kpis.blockers.length > 1 ? 's' : ''}` : 'Overdue'}
+                  </p>
+                </div>
+                {kpis.blockers.length > 0 && (
+                  <span className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
+                    {kpis.blockers.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Centre d'action — col-span-2 */}
+              <button
+                onClick={() => navigate('/action-center')}
+                className={`col-span-2 flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border ${
+                  kpis.overdues > 0
+                    ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
+                    : 'bg-white border-slate-200/60 hover:border-violet-200'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
+                }`}>
+                  <Zap className={`w-7 h-7 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-400'}`} />
+                </div>
+                <div>
+                  <p className={`font-bold text-sm ${kpis.overdues > 0 ? 'text-violet-900' : 'text-gray-900'}`}>
+                    Centre d'action
+                  </p>
+                  <p className={`text-sm mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-slate-500'}`}>
+                    {kpis.overdues > 0
+                      ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
+                      : 'Relances & tâches unifiées'}
+                  </p>
+                </div>
+              </button>
+
+              {/* Email Engine — col-span-2 */}
+              <button
+                onClick={() => navigate('/email-engine')}
+                className="col-span-2 flex items-center gap-4 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200"
+              >
+                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Send className="w-7 h-7 text-slate-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900">Email Engine</p>
+                  <p className="text-sm text-slate-500 mt-0.5">Historique des envois</p>
+                </div>
+              </button>
+
             </div>
           </div>
-          <p className="text-3xl font-bold text-emerald-900">
-            {(kpis.caOnboarde / 1000).toFixed(0)}k€
-          </p>
-          <p className="text-xs text-emerald-600 mt-1">
-            {signedClients.length} LDM signées
-          </p>
-        </div>
 
-        {/* Clients actifs */}
-        <button
-          className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm text-left hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-300"
-          onClick={() => navigate('/dossiers-actifs')}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-slate-500 font-medium">Clients actifs</p>
-            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
-              <Users className="w-5 h-5 text-blue-600" />
-            </div>
+          {/* ── Charts ─────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="bg-white border border-slate-200/60 rounded-2xl shadow-sm">
+              <CardHeader className="pb-0 pt-4 px-5">
+                <CardTitle className="text-xs font-medium text-slate-600">
+                  CA signé mensuel (LDM signées, €)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2 px-5 pb-4">
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={chartData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="mois" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px' }}
+                      formatter={(val: number) => [`${val.toLocaleString('fr-FR')} €`, 'CA signé']}
+                    />
+                    <Bar dataKey="ca" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-slate-200/60 rounded-2xl shadow-sm">
+              <CardHeader className="pb-0 pt-4 px-5">
+                <CardTitle className="text-xs font-medium text-slate-600">
+                  Charge de travail (nouveaux dossiers)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2 px-5 pb-4">
+                <ResponsiveContainer width="100%" height={150}>
+                  <AreaChart data={chartData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradDossiers" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="mois" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: '#94a3b8' }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px' }}
+                      formatter={(val: number) => [val, 'Dossiers']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="dossiers"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      fill="url(#gradDossiers)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </div>
-          <p className="text-3xl font-bold text-slate-900">{kpis.clientsActifs}</p>
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-            dossiers en cours <ArrowRight className="w-3 h-3" />
-          </p>
-        </button>
 
-        {/* Tâches / Alertes */}
-        <button
-          className={`rounded-2xl p-5 shadow-sm text-left transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 border ${
-            kpis.blockers.length > 0
-              ? 'bg-red-50/50 border-red-200/60 hover:border-red-300'
-              : 'bg-white border-slate-200/60 hover:border-red-200'
-          }`}
-          onClick={() => navigate('/taches-overdue')}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-medium ${kpis.blockers.length > 0 ? 'text-red-600' : 'text-slate-500'}`}>
-              Tâches / Alertes
-            </p>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${kpis.blockers.length > 0 ? 'bg-red-100' : 'bg-slate-100'}`}>
-              <AlertTriangle className={`w-5 h-5 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-slate-400'}`} />
-            </div>
-          </div>
-          <p className={`text-3xl font-bold ${kpis.blockers.length > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-            {kpis.blockers.length}
-          </p>
-          <p className={`text-xs mt-1 flex items-center gap-1 ${kpis.blockers.length > 0 ? 'text-red-400' : 'text-slate-400'}`}>
-            blocages actifs <ArrowRight className="w-3 h-3" />
-          </p>
-        </button>
-      </div>
-
-      {/* ── Charts ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CA signé mensuel */}
-        <Card className="bg-white border border-slate-200/60 rounded-2xl shadow-sm">
-          <CardHeader className="pb-0 pt-5 px-5">
-            <CardTitle className="text-sm font-medium text-slate-700">
-              CA signé mensuel (LDM signées, €)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-3 px-5 pb-5">
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={chartData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="mois" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                  formatter={(val: number) => [`${val.toLocaleString('fr-FR')} €`, 'CA signé']}
-                />
-                <Bar dataKey="ca" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Charge de travail */}
-        <Card className="bg-white border border-slate-200/60 rounded-2xl shadow-sm">
-          <CardHeader className="pb-0 pt-5 px-5">
-            <CardTitle className="text-sm font-medium text-slate-700">
-              Charge de travail (nouveaux dossiers)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-3 px-5 pb-5">
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={chartData} margin={{ top: 0, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gradDossiers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="mois" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                  formatter={(val: number) => [val, 'Dossiers']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="dossiers"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  fill="url(#gradDossiers)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        </div>{/* end right panel */}
+      </div>{/* end main layout */}
 
       {/* ── Blocages & Actions requises ──────────────────────────────── */}
       {kpis.blockers.length > 0 && (
@@ -529,66 +744,6 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </div>
       )}
 
-      {/* ── Autres accès ─────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-          Autres accès
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          <button
-            onClick={() => navigate('/fiscal-calendar')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Calendrier Fiscal</p>
-              <p className="text-xs text-slate-400 truncate">Échéances</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/ged')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <HardDrive className="w-4 h-4 text-sky-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">GED SharePoint</p>
-              <p className="text-xs text-slate-400 truncate">Documents</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/taches-overdue')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Tâches en retard</p>
-              <p className="text-xs text-slate-400 truncate">Overdue</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/relances-critiques')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-orange-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Relances critiques</p>
-              <p className="text-xs text-slate-400 truncate">Urgences</p>
-            </div>
-          </button>
-        </div>
-      </div>
-
       {/* ── Nouveau Dossier Modal ─────────────────────────────────────── */}
       {showNewDossierModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -615,9 +770,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                   <p className="text-sm font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
                     Reprise de dossier
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Client existant avec SIREN
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Client existant avec SIREN</p>
                 </div>
               </button>
               <button
@@ -632,9 +785,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                   <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
                     Création d'entreprise
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nouveau client sans SIREN
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Nouveau client sans SIREN</p>
                 </div>
               </button>
               <button
@@ -649,15 +800,24 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                   <p className="text-sm font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
                     Nouveau prospect
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Dossier vierge à compléter
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Dossier vierge à compléter</p>
                 </div>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Shimmer animation keyframes */}
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer-strip { animation: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
