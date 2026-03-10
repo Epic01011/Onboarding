@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, X, BookOpen, Handshake, FolderKanban,
-  HardDrive, Send, Zap,
+  HardDrive, Send, Zap, ChevronDown,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -198,7 +198,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* ── Page Header ──────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -217,127 +217,318 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </button>
       </div>
 
-      {/* ── Tools Grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {/* 1. Moteur de Pricing */}
-        <button
-          onClick={() => navigate('/pricing')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calculator className="w-5 h-5 text-violet-600" />
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* BLOC 1 — CONVERSION (fond bleu très léger)                    */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+          <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-widest">
+            Conversion — Proposition commerciale
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Prospection */}
+          <div className="flex items-center gap-3 bg-white border border-blue-100 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/prospection')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Radar className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Prospection</p>
+                <p className="text-xs text-slate-400 truncate">CRM & suivi prospects</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/prospection')}
+              title="Ajouter un prospect"
+              className="w-7 h-7 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-blue-600" />
+            </button>
           </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Pricing</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Calculer les honoraires</p>
-          </div>
-        </button>
 
-        {/* 2. Moteur de LDM */}
-        <button
-          onClick={() => navigate('/lettre-mission')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
+          {/* Pricing */}
+          <div className="flex items-center gap-3 bg-white border border-blue-100 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/pricing')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Calculator className="w-5 h-5 text-violet-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Pricing</p>
+                <p className="text-xs text-slate-400 truncate">Calculer les honoraires</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/pricing')}
+              title="Nouveau devis"
+              className="w-7 h-7 bg-violet-50 hover:bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-violet-600" />
+            </button>
+          </div>
+
+          {/* LDM / Signature */}
+          <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
             validatedQuotesCount > 0
-              ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
-              : 'bg-white border-slate-200/60 hover:border-emerald-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            validatedQuotesCount > 0 ? 'bg-emerald-100' : 'bg-emerald-50'
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-white border-blue-100'
           }`}>
-            <Cog className={`w-5 h-5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-emerald-500'}`} />
+            <button
+              onClick={() => navigate('/lettre-mission')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                validatedQuotesCount > 0 ? 'bg-emerald-100' : 'bg-emerald-50'
+              }`}>
+                <Cog className={`w-5 h-5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-emerald-500'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${validatedQuotesCount > 0 ? 'text-emerald-800' : 'text-gray-900'}`}>
+                  LDM / Signature
+                </p>
+                <p className={`text-xs truncate ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {validatedQuotesCount > 0
+                    ? `${validatedQuotesCount} proposition${validatedQuotesCount > 1 ? 's' : ''} à traiter`
+                    : 'Lettres de mission'}
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/lettre-mission')}
+              title="Nouvelle LDM"
+              className="w-7 h-7 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-emerald-600" />
+            </button>
           </div>
-          <div>
-            <p className={`font-semibold text-sm ${validatedQuotesCount > 0 ? 'text-emerald-800' : 'text-gray-900'}`}>
-              Moteur LDM
-            </p>
-            <p className={`text-xs mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-              {validatedQuotesCount > 0
-                ? `${validatedQuotesCount} proposition${validatedQuotesCount > 1 ? 's' : ''} validée${validatedQuotesCount > 1 ? 's' : ''} à traiter`
-                : 'Lettres de mission'}
-            </p>
-          </div>
-        </button>
+        </div>
+      </div>
 
-        {/* 3. Moteur de Reprise Confraternelle */}
-        <button
-          onClick={() => navigate('/lettre-reprise')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-amber-200"
-        >
-          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Handshake className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de reprise confraternelle</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Lettres confraternelles</p>
-          </div>
-        </button>
+      {/* ── Connecteur visuel Bloc 1 → Bloc 2 ────────────────────────── */}
+      <div className="flex flex-col items-center gap-1 py-1">
+        <div className="w-px h-4 bg-gradient-to-b from-blue-200 to-indigo-200" />
+        <ChevronDown className="w-4 h-4 text-indigo-300" />
+        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Entrée en base</p>
+      </div>
 
-        {/* 4. Moteur de Prospection */}
-        <button
-          onClick={() => navigate('/prospection')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Radar className="w-5 h-5 text-blue-600" />
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* BLOC 2 — INTÉGRATION (fond indigo très léger)                 */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+          <h2 className="text-xs font-semibold text-indigo-600 uppercase tracking-widest">
+            Intégration — Collecte & validation
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Nouveau Dossier / Onboarding */}
+          <div className="flex items-center gap-3 bg-white border border-indigo-100 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/dossiers-actifs')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FolderKanban className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Nouveaux Dossiers</p>
+                <p className="text-xs text-slate-400 truncate">
+                  {kpis.clientsActifs > 0 ? `${kpis.clientsActifs} dossier${kpis.clientsActifs > 1 ? 's' : ''} en cours` : 'Créer & suivre les dossiers'}
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => setShowNewDossierModal(true)}
+              title="Nouveau dossier"
+              className="w-7 h-7 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-indigo-600" />
+            </button>
           </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Prospection</p>
-            <p className="text-xs text-muted-foreground mt-0.5">CRM & relances</p>
-          </div>
-        </button>
 
-        {/* 5. Inbox IA */}
-        <button
-          onClick={() => navigate('/inbox-ia')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
+          {/* Reprise Confraternelle */}
+          <div className="flex items-center gap-3 bg-white border border-indigo-100 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/lettre-reprise')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Handshake className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Reprise Confraternelle</p>
+                <p className="text-xs text-slate-400 truncate">Lettres confraternelles</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/lettre-reprise')}
+              title="Nouvelle lettre confraternelle"
+              className="w-7 h-7 bg-amber-50 hover:bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-amber-600" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* BLOC 3 — PRODUCTION (fond gris/blanc)                         */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      <div className="bg-slate-50/80 border border-slate-200/60 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            Production — Gestion quotidienne
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {/* Inbox IA */}
+          <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
             kpis.aiPending > 0
-              ? 'bg-purple-50 border-purple-200 hover:border-purple-300'
-              : 'bg-white border-slate-200/60 hover:border-purple-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
+              ? 'bg-purple-50 border-purple-200'
+              : 'bg-white border-slate-200/60'
           }`}>
-            <Mail className={`w-5 h-5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-500'}`} />
+            <button
+              onClick={() => navigate('/inbox-ia')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
+              }`}>
+                <Mail className={`w-5 h-5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-500'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${kpis.aiPending > 0 ? 'text-purple-800' : 'text-gray-900'}`}>
+                  Inbox IA
+                </p>
+                <p className={`text-xs truncate ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-slate-400'}`}>
+                  {kpis.aiPending > 0
+                    ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
+                    : 'Emails & brouillons IA'}
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/inbox-ia')}
+              title="Composer un email"
+              className="w-7 h-7 bg-purple-50 hover:bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-purple-600" />
+            </button>
           </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.aiPending > 0 ? 'text-purple-800' : 'text-gray-900'}`}>
-              Inbox IA
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-muted-foreground'}`}>
-              {kpis.aiPending > 0
-                ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
-                : 'Emails & brouillons IA'}
-            </p>
-          </div>
-        </button>
 
-        {/* 6. Centre d'action unifié */}
-        <button
-          onClick={() => navigate('/action-center')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
+          {/* Calendrier Fiscal */}
+          <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/fiscal-calendar')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Calendrier Fiscal</p>
+                <p className="text-xs text-slate-400 truncate">Échéances fiscales</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/fiscal-calendar')}
+              title="Ajouter une échéance"
+              className="w-7 h-7 bg-amber-50 hover:bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-amber-600" />
+            </button>
+          </div>
+
+          {/* GED SharePoint */}
+          <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/ged')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-sky-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <HardDrive className="w-5 h-5 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">GED SharePoint</p>
+                <p className="text-xs text-slate-400 truncate">Documents clients</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/ged')}
+              title="Uploader un document"
+              className="w-7 h-7 bg-sky-50 hover:bg-sky-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-sky-600" />
+            </button>
+          </div>
+
+          {/* Tâches */}
+          <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
             kpis.overdues > 0
-              ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
-              : 'bg-white border-slate-200/60 hover:border-violet-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
+              ? 'bg-violet-50 border-violet-200'
+              : 'bg-white border-slate-200/60'
           }`}>
-            <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
+            <button
+              onClick={() => navigate('/action-center')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
+              }`}>
+                <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
+                  Tâches
+                </p>
+                <p className={`text-xs truncate ${kpis.overdues > 0 ? 'text-violet-600' : 'text-slate-400'}`}>
+                  {kpis.overdues > 0
+                    ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} en retard`
+                     : 'Tâches & suivi'}
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/action-center')}
+              title="Voir les tâches en retard"
+              className="w-7 h-7 bg-violet-50 hover:bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-violet-600" />
+            </button>
           </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
-              Centre d'action
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-muted-foreground'}`}>
-              {kpis.overdues > 0
-                ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
-                : 'Relances & tâches unifiées'}
-            </p>
+
+          {/* Relances */}
+          <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/relances-critiques')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 text-orange-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Relances</p>
+                <p className="text-xs text-slate-400 truncate">Relances critiques</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/relances-critiques')}
+              title="Voir les relances"
+              className="w-7 h-7 bg-orange-50 hover:bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-orange-500" />
+            </button>
           </div>
-        </button>
+        </div>
       </div>
 
       {/* ── KPI Cards ────────────────────────────────────────────────── */}
@@ -528,66 +719,6 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
           </div>
         </div>
       )}
-
-      {/* ── Autres accès ─────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-          Autres accès
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          <button
-            onClick={() => navigate('/fiscal-calendar')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Calendrier Fiscal</p>
-              <p className="text-xs text-slate-400 truncate">Échéances</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/ged')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <HardDrive className="w-4 h-4 text-sky-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">GED SharePoint</p>
-              <p className="text-xs text-slate-400 truncate">Documents</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/taches-overdue')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Tâches en retard</p>
-              <p className="text-xs text-slate-400 truncate">Overdue</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/relances-critiques')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-300"
-          >
-            <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-orange-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Relances critiques</p>
-              <p className="text-xs text-slate-400 truncate">Urgences</p>
-            </div>
-          </button>
-        </div>
-      </div>
 
       {/* ── Nouveau Dossier Modal ─────────────────────────────────────── */}
       {showNewDossierModal && (
