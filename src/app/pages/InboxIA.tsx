@@ -17,13 +17,12 @@ type ActiveTab = 'drafts' | 'sent';
 // ─── System prompt defaults ────────────────────────────────────────────────────
 
 const DEFAULT_SYSTEM_PROMPTS: SystemPromptConfig = {
-  fiscal: "Tu es un expert-comptable fiscaliste. Rédige des réponses précises, professionnelles et fondées sur le droit fiscal français (CGI, BOFiP). Cite les articles applicables.",
-  social: "Tu es un expert-comptable spécialisé en droit social. Rédige des réponses claires sur les cotisations, contrats et obligations sociales, en référençant le Code du travail et l'URSSAF.",
-  relance: "Tu es un expert-comptable rédacteur de relances professionnelles. Formule des relances courtois mais fermes, adaptées au contexte (factures impayées, documents manquants, délais).",
+  claude: "Tu es un expert-comptable. Rédige des réponses précises, professionnelles et bienveillantes, fondées sur le droit fiscal et social français. Cite les textes légaux applicables (CGI, BOFiP, Code du travail). Formate la réponse en HTML valide.",
+  openai: "Tu es un expert-comptable. Rédige des réponses claires et structurées, avec des références légales précises (CGI, BOFiP, URSSAF). Commence toujours par bonjour et termine par une formule de politesse. Formate la réponse en HTML valide.",
   perplexity: "Tu es un assistant IA avec accès à des recherches web en temps réel. Utilise tes capacités de recherche pour fournir des informations fiscales et comptables à jour, en citant les sources et textes réglementaires les plus récents (BOFiP, CGI, jurisprudence). Vérifie toujours l'actualité des références mentionnées.",
 };
 
-const LOCAL_STORAGE_PROMPTS_KEY = 'inbox_ia_system_prompts';
+const LOCAL_STORAGE_PROMPTS_KEY = 'inbox_ia_system_prompts_v2';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 
@@ -277,11 +276,10 @@ function SystemPromptPanel({
     onClose();
   };
 
-  const categories: { key: keyof SystemPromptConfig; label: string; labelClass: string; borderClass: string; ringClass: string; bgClass: string }[] = [
-    { key: 'fiscal', label: 'Fiscale', labelClass: 'text-blue-700', borderClass: 'border-blue-200', ringClass: 'focus:ring-blue-300', bgClass: 'bg-blue-50/30' },
-    { key: 'social', label: 'Sociale', labelClass: 'text-green-700', borderClass: 'border-green-200', ringClass: 'focus:ring-green-300', bgClass: 'bg-green-50/30' },
-    { key: 'relance', label: 'Relance', labelClass: 'text-amber-700', borderClass: 'border-amber-200', ringClass: 'focus:ring-amber-300', bgClass: 'bg-amber-50/30' },
-    { key: 'perplexity', label: 'Perplexity AI (recherche web)', labelClass: 'text-purple-700', borderClass: 'border-purple-200', ringClass: 'focus:ring-purple-300', bgClass: 'bg-purple-50/30' },
+  const categories: { key: keyof SystemPromptConfig; label: string; icon: string; labelClass: string; borderClass: string; ringClass: string; bgClass: string }[] = [
+    { key: 'claude', label: 'Claude (Anthropic)', icon: '🤖', labelClass: 'text-orange-700', borderClass: 'border-orange-200', ringClass: 'focus:ring-orange-300', bgClass: 'bg-orange-50/30' },
+    { key: 'openai', label: 'GPT (OpenAI)', icon: '✨', labelClass: 'text-blue-700', borderClass: 'border-blue-200', ringClass: 'focus:ring-blue-300', bgClass: 'bg-blue-50/30' },
+    { key: 'perplexity', label: 'Perplexity AI', icon: '🔍', labelClass: 'text-purple-700', borderClass: 'border-purple-200', ringClass: 'focus:ring-purple-300', bgClass: 'bg-purple-50/30' },
   ];
 
   return (
@@ -291,7 +289,7 @@ function SystemPromptPanel({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-gray-600" />
-            <h2 className="text-base font-semibold text-gray-900">Pré-instructions IA par type d'email</h2>
+            <h2 className="text-base font-semibold text-gray-900">Pré-instructions IA par fournisseur</h2>
           </div>
           <button
             onClick={onClose}
@@ -304,20 +302,21 @@ function SystemPromptPanel({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           <p className="text-xs text-gray-500">
-            Ces instructions sont ajoutées en tête du prompt système lors de la génération IA.
-            Personnalisez-les selon les pratiques de votre cabinet. La section <span className="font-medium text-purple-700">Perplexity AI</span> s'applique uniquement quand ce fournisseur est sélectionné dans les paramètres.
+            Chaque fournisseur IA peut recevoir une instruction système personnalisée.
+            L'instruction du fournisseur actif est automatiquement appliquée lors de la génération de brouillons.
+            Configurez le fournisseur actif dans les <strong>Paramètres → Configuration de l'IA</strong>.
           </p>
-          {categories.map(({ key, label, labelClass, borderClass, ringClass, bgClass }) => (
+          {categories.map(({ key, label, icon, labelClass, borderClass, ringClass, bgClass }) => (
             <div key={key}>
               <label className={`block text-xs font-semibold mb-1.5 ${labelClass}`}>
-                Emails — {label}
+                {icon} {label}
               </label>
               <textarea
                 rows={4}
                 value={draft[key]}
                 onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))}
                 className={`w-full p-3 text-sm border ${borderClass} rounded-xl focus:outline-none focus:ring-2 ${ringClass} resize-none ${bgClass} font-mono`}
-                placeholder={`Instruction pour les emails de type "${label}"…`}
+                placeholder={`Instruction système pour ${label}…`}
               />
             </div>
           ))}
@@ -835,7 +834,16 @@ export function InboxIA() {
   const [systemPrompts, setSystemPrompts] = useState<SystemPromptConfig>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_PROMPTS_KEY);
-      return stored ? (JSON.parse(stored) as SystemPromptConfig) : DEFAULT_SYSTEM_PROMPTS;
+      if (stored) return JSON.parse(stored) as SystemPromptConfig;
+      // Migrate Perplexity instruction from v1 storage (fiscal/social/relance/perplexity format)
+      const v1 = localStorage.getItem('inbox_ia_system_prompts');
+      if (v1) {
+        const v1Data = JSON.parse(v1) as { perplexity?: string };
+        if (v1Data.perplexity?.trim()) {
+          return { ...DEFAULT_SYSTEM_PROMPTS, perplexity: v1Data.perplexity };
+        }
+      }
+      return DEFAULT_SYSTEM_PROMPTS;
     } catch {
       return DEFAULT_SYSTEM_PROMPTS;
     }

@@ -3,12 +3,18 @@ export type EmailDraftStatus = 'pending_review' | 'approved' | 'rejected' | 'sen
 /** Sentiment tags automatically applied to an incoming email. */
 export type SentimentTag = 'urgent' | 'unhappy' | 'document_request';
 
-/** Pre-instruction (system prompt) text per email category. */
+/** Pre-instruction (system prompt) text per AI provider.
+ *
+ * Each provider can have a distinct system instruction that is prepended
+ * to the base prompt before generation. The active provider's instruction
+ * is automatically selected when drafts are generated in Inbox IA.
+ */
 export interface SystemPromptConfig {
-  fiscal: string;
-  social: string;
-  relance: string;
-  /** Pre-instruction spécifique à Perplexity AI (recherche web en temps réel). */
+  /** Pre-instruction used when Claude (Anthropic) is the active AI provider. */
+  claude: string;
+  /** Pre-instruction used when OpenAI (GPT) is the active AI provider. */
+  openai: string;
+  /** Pre-instruction used when Perplexity AI is the active provider. */
   perplexity: string;
 }
 

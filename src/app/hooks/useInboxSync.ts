@@ -122,11 +122,11 @@ export function useInboxSync(): UseInboxSyncReturn {
       };
 
       // Resolve the pre-instruction to send to the AI based on the selected provider.
-      // When Perplexity is active, use the Perplexity-specific system prompt from the inbox config.
+      // Each provider can have its own customizable instruction configured in Inbox IA.
+      // activeProvider is typed as AiProvider = 'claude' | 'openai' | 'perplexity',
+      // which matches keyof SystemPromptConfig exactly, so direct indexing is type-safe.
       const activeProvider = cabinetWithKey.aiProvider ?? 'claude';
-      const preInstruction = activeProvider === 'perplexity' && systemPrompts?.perplexity
-        ? systemPrompts.perplexity
-        : undefined;
+      const preInstruction = systemPrompts?.[activeProvider]?.trim() || undefined;
 
       // 2. Fetch unread emails from Microsoft Graph.
       let clientEmails;
