@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, X, BookOpen, Handshake, FolderKanban,
-  HardDrive, Send, Zap,
+  HardDrive, Send,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -217,127 +217,91 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </button>
       </div>
 
-      {/* ── Tools Grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {/* 1. Moteur de Pricing */}
-        <button
-          onClick={() => navigate('/pricing')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calculator className="w-5 h-5 text-violet-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Pricing</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Calculer les honoraires</p>
-          </div>
-        </button>
+      {/* ── LE TUNNEL (Processus de conversion client) ───────────────── */}
+      <div>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+          Tunnel de conversion client
+        </h2>
+        <div className="flex items-stretch rounded-2xl overflow-hidden shadow-md border border-slate-200/40">
+          {/* Étape 1 : Moteur Prospection */}
+          <button
+            onClick={() => navigate('/prospection')}
+            className="group relative flex-1 flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gradient-to-br from-blue-700 to-blue-500 hover:from-blue-800 hover:to-blue-600 text-white transition-all duration-300 min-h-[110px]"
+          >
+            <Radar className="w-7 h-7 drop-shadow" />
+            <span className="text-sm font-semibold text-center leading-tight">Moteur Prospection</span>
+            <span className="text-xs opacity-70">CRM & leads</span>
+            <span className="absolute bottom-2 right-2 text-[11px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
 
-        {/* 2. Moteur de LDM */}
-        <button
-          onClick={() => navigate('/lettre-mission')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            validatedQuotesCount > 0
-              ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
-              : 'bg-white border-slate-200/60 hover:border-emerald-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            validatedQuotesCount > 0 ? 'bg-emerald-100' : 'bg-emerald-50'
-          }`}>
-            <Cog className={`w-5 h-5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-emerald-500'}`} />
+          {/* Séparateur flèche */}
+          <div className="flex items-center bg-gradient-to-r from-blue-500 to-blue-400 px-1.5 flex-shrink-0">
+            <ArrowRight className="w-4 h-4 text-white/50" />
           </div>
-          <div>
-            <p className={`font-semibold text-sm ${validatedQuotesCount > 0 ? 'text-emerald-800' : 'text-gray-900'}`}>
-              Moteur LDM
-            </p>
-            <p className={`text-xs mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+
+          {/* Étape 2 : Moteur Pricing */}
+          <button
+            onClick={() => navigate('/pricing')}
+            className="group relative flex-1 flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gradient-to-br from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white transition-all duration-300 min-h-[110px]"
+          >
+            <Calculator className="w-7 h-7 drop-shadow" />
+            <span className="text-sm font-semibold text-center leading-tight">Moteur Pricing</span>
+            <span className="text-xs opacity-70">Honoraires</span>
+            <span className="absolute bottom-2 right-2 text-[11px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
+
+          {/* Séparateur flèche */}
+          <div className="flex items-center bg-gradient-to-r from-teal-500 to-teal-400 px-1.5 flex-shrink-0">
+            <ArrowRight className="w-4 h-4 text-white/50" />
+          </div>
+
+          {/* Étape 3 : Moteur LDM */}
+          <button
+            onClick={() => navigate('/lettre-mission')}
+            className="group relative flex-1 flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gradient-to-br from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white transition-all duration-300 min-h-[110px]"
+          >
+            <div className="relative">
+              <Cog className="w-7 h-7 drop-shadow" />
+              {validatedQuotesCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-yellow-400 text-yellow-900 text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                  {validatedQuotesCount}
+                </span>
+              )}
+            </div>
+            <span className="text-sm font-semibold text-center leading-tight">Moteur LDM</span>
+            <span className="text-xs opacity-70">
               {validatedQuotesCount > 0
-                ? `${validatedQuotesCount} proposition${validatedQuotesCount > 1 ? 's' : ''} validée${validatedQuotesCount > 1 ? 's' : ''} à traiter`
+                ? `${validatedQuotesCount} à traiter`
                 : 'Lettres de mission'}
-            </p>
-          </div>
-        </button>
+            </span>
+            <span className="absolute bottom-2 right-2 text-[11px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
 
-        {/* 3. Moteur de Reprise Confraternelle */}
-        <button
-          onClick={() => navigate('/lettre-reprise')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-amber-200"
-        >
-          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Handshake className="w-5 h-5 text-amber-600" />
+          {/* Séparateur flèche */}
+          <div className="flex items-center bg-gradient-to-r from-emerald-500 to-emerald-400 px-1.5 flex-shrink-0">
+            <ArrowRight className="w-4 h-4 text-white/50" />
           </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de reprise confraternelle</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Lettres confraternelles</p>
-          </div>
-        </button>
 
-        {/* 4. Moteur de Prospection */}
-        <button
-          onClick={() => navigate('/prospection')}
-          className="group flex flex-col items-start gap-3 bg-white border border-slate-200/60 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200"
-        >
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Radar className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-gray-900">Moteur de Prospection</p>
-            <p className="text-xs text-muted-foreground mt-0.5">CRM & relances</p>
-          </div>
-        </button>
-
-        {/* 5. Inbox IA */}
-        <button
-          onClick={() => navigate('/inbox-ia')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            kpis.aiPending > 0
-              ? 'bg-purple-50 border-purple-200 hover:border-purple-300'
-              : 'bg-white border-slate-200/60 hover:border-purple-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
-          }`}>
-            <Mail className={`w-5 h-5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-500'}`} />
-          </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.aiPending > 0 ? 'text-purple-800' : 'text-gray-900'}`}>
-              Inbox IA
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-muted-foreground'}`}>
-              {kpis.aiPending > 0
-                ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
-                : 'Emails & brouillons IA'}
-            </p>
-          </div>
-        </button>
-
-        {/* 6. Centre d'action unifié */}
-        <button
-          onClick={() => navigate('/action-center')}
-          className={`group flex flex-col items-start gap-3 rounded-2xl p-5 h-36 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border ${
-            kpis.overdues > 0
-              ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
-              : 'bg-white border-slate-200/60 hover:border-violet-200'
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
-          }`}>
-            <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
-          </div>
-          <div>
-            <p className={`font-semibold text-sm ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
-              Centre d'action
-            </p>
-            <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-muted-foreground'}`}>
-              {kpis.overdues > 0
-                ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
-                : 'Relances & tâches unifiées'}
-            </p>
-          </div>
-        </button>
+          {/* Étape 4 : Nouveau Dossier / Onboarding */}
+          <button
+            onClick={() => setShowNewDossierModal(true)}
+            disabled={creatingDossier}
+            className="group relative flex-1 flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white transition-all duration-300 min-h-[110px] disabled:opacity-60"
+          >
+            <FolderKanban className="w-7 h-7 drop-shadow" />
+            <span className="text-sm font-semibold text-center leading-tight">Nouveau Dossier</span>
+            <span className="text-xs opacity-70">Onboarding client</span>
+            <span className="absolute bottom-2 right-2 text-[11px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ── KPI Cards ────────────────────────────────────────────────── */}
@@ -529,63 +493,151 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </div>
       )}
 
-      {/* ── Autres accès ─────────────────────────────────────────────── */}
+      {/* ── LA MATRICE D'OUTILS (Modules transverses) ────────────────── */}
       <div>
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-          Autres accès
+          Modules transverses
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+
+          {/* Inbox IA */}
+          <button
+            onClick={() => navigate('/inbox-ia')}
+            className={`group relative text-left rounded-2xl p-5 border shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ${
+              kpis.aiPending > 0
+                ? 'bg-purple-50 border-purple-200'
+                : 'bg-white border-slate-200/60 hover:border-purple-200'
+            }`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                kpis.aiPending > 0 ? 'bg-purple-100' : 'bg-purple-50'
+              }`}>
+                <Mail className={`w-5 h-5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
+              </div>
+              <div>
+                <p className={`font-semibold text-sm ${kpis.aiPending > 0 ? 'text-purple-800' : 'text-gray-900'}`}>
+                  Inbox IA
+                </p>
+                <p className={`text-xs mt-0.5 ${kpis.aiPending > 0 ? 'text-purple-600' : 'text-muted-foreground'}`}>
+                  {kpis.aiPending > 0
+                    ? `${kpis.aiPending} brouillon${kpis.aiPending > 1 ? 's' : ''} en attente`
+                    : 'Emails & brouillons IA'}
+                </p>
+              </div>
+            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-purple-100 text-purple-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
+
+          {/* Calendrier Fiscal */}
           <button
             onClick={() => navigate('/fiscal-calendar')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-amber-200 transition-all duration-300"
+            className="group relative text-left bg-white border border-slate-200/60 hover:border-amber-200 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
-            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-4 h-4 text-amber-600" />
+            <div className="flex flex-col gap-3">
+              <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">Calendrier Fiscal</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Échéances fiscales</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Calendrier Fiscal</p>
-              <p className="text-xs text-slate-400 truncate">Échéances</p>
-            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-amber-100 text-amber-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
           </button>
 
+          {/* GED SharePoint */}
           <button
             onClick={() => navigate('/ged')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-300"
+            className="group relative text-left bg-white border border-slate-200/60 hover:border-sky-200 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
-            <div className="w-8 h-8 bg-sky-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <HardDrive className="w-4 h-4 text-sky-600" />
+            <div className="flex flex-col gap-3">
+              <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <HardDrive className="w-5 h-5 text-sky-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">GED SharePoint</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Documents & archivage</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">GED SharePoint</p>
-              <p className="text-xs text-slate-400 truncate">Documents</p>
-            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-sky-100 text-sky-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
           </button>
 
+          {/* Reprise Confraternelle */}
           <button
-            onClick={() => navigate('/taches-overdue')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 transition-all duration-300"
+            onClick={() => navigate('/lettre-reprise')}
+            className="group relative text-left bg-white border border-slate-200/60 hover:border-amber-300 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
-            <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+            <div className="flex flex-col gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Handshake className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">Reprise Confraternelle</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Lettres confraternelles</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Tâches en retard</p>
-              <p className="text-xs text-slate-400 truncate">Overdue</p>
-            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-amber-100 text-amber-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
           </button>
 
+          {/* Relances Critiques */}
           <button
             onClick={() => navigate('/relances-critiques')}
-            className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-300"
+            className="group relative text-left bg-white border border-slate-200/60 hover:border-orange-300 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
-            <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-orange-500" />
+            <div className="flex flex-col gap-3">
+              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-gray-900">Relances Critiques</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Urgences & alertes</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">Relances critiques</p>
-              <p className="text-xs text-slate-400 truncate">Urgences</p>
-            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-orange-100 text-orange-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
           </button>
+
+          {/* Tâches en Retard */}
+          <button
+            onClick={() => navigate('/taches-overdue')}
+            className={`group relative text-left rounded-2xl p-5 border shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ${
+              kpis.overdues > 0
+                ? 'bg-red-50 border-red-200'
+                : 'bg-white border-slate-200/60 hover:border-red-200'
+            }`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                kpis.overdues > 0 ? 'bg-red-100' : 'bg-red-50'
+              }`}>
+                <AlertTriangle className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-red-600' : 'text-red-400'}`} />
+              </div>
+              <div>
+                <p className={`font-semibold text-sm ${kpis.overdues > 0 ? 'text-red-800' : 'text-gray-900'}`}>
+                  Tâches en Retard
+                </p>
+                <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                  {kpis.overdues > 0
+                    ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} en retard`
+                    : 'Dossiers en retard'}
+                </p>
+              </div>
+            </div>
+            <span className="absolute bottom-3 right-3 text-[11px] bg-red-100 text-red-700 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+              Accès rapide →
+            </span>
+          </button>
+
         </div>
       </div>
 
