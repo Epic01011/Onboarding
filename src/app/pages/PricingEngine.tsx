@@ -38,6 +38,10 @@ import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '../components/ui/accordion';
+import { ScrollArea } from '../components/ui/scroll-area';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
@@ -2095,122 +2099,147 @@ function SavedQuoteCard({
   const isValidated = quote.status === 'VALIDATED';
   const isSent = quote.status === 'SENT';
 
+  const statusBadge = isValidated
+    ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 gap-1"><CheckCircle2 className="w-3 h-3" />Validé LDM</Badge>
+    : isSent
+      ? <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 gap-1"><Mail className="w-3 h-3" />Envoyé</Badge>
+      : quote.supabaseId
+        ? <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100 border-0">Brouillon</Badge>
+        : null;
+
+  const borderClasses = isValidated
+    ? 'border-emerald-300 ring-1 ring-emerald-100'
+    : isSent
+      ? 'border-blue-300 ring-1 ring-blue-100'
+      : 'border-gray-200';
+
   return (
-    <div
-      className={`bg-white rounded-xl border shadow-sm p-5 cursor-pointer hover:shadow-md transition-all ${isValidated ? 'border-emerald-300 ring-1 ring-emerald-100' : isSent ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200 hover:border-blue-200'}`}
-      onClick={() => onReExport(quote)}
+    <AccordionItem
+      value={quote.id}
+      className={`rounded-xl border shadow-sm bg-white overflow-hidden ${borderClasses}`}
     >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold text-gray-900 truncate">{quote.clientName}</h3>
-            {isValidated && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                <CheckCircle2 className="w-3 h-3" /> Validé LDM
-              </span>
-            )}
-            {isSent && (
-              <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                <Mail className="w-3 h-3" /> Envoyé
-              </span>
-            )}
-            {!isValidated && !isSent && quote.supabaseId && (
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">Brouillon</span>
-            )}
+      {/* ── Trigger (summary row) ── */}
+      <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-gray-50/50 [&[data-state=open]]:bg-gray-50/50 transition-colors">
+        <div className="flex items-center justify-between w-full gap-3 pr-2">
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 truncate">{quote.clientName}</h3>
+              {statusBadge}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
+              {quote.legalForm} · {quote.revenueRange} · {quote.taxRegime} ·{' '}
+              {quote.digitalization === 'numerique' ? '100% numérisé' : 'Papier'}
+              {quote.bilanCompris && ' · RDV bilan compris'}
+              {quote.rdvAtterrissage && ' · RDV atterrissage'}
+            </p>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
-            {quote.legalForm} · {quote.revenueRange} · {quote.taxRegime} ·{' '}
-            {quote.digitalization === 'numerique' ? '100% numérisé' : 'Papier'}
-            {quote.bilanCompris && ' · RDV bilan compris'}
-            {quote.rdvAtterrissage && ' · RDV atterrissage'}
-          </p>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-sm font-bold text-blue-700">{quote.totalMonthlyHT.toLocaleString('fr-FR')} €<span className="text-xs font-normal text-gray-400">/mois</span></p>
+              <p className="text-xs text-gray-400">{new Date(quote.createdAt).toLocaleDateString('fr-FR')}</p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <p className="text-xs text-gray-400">
-            {new Date(quote.createdAt).toLocaleDateString('fr-FR')}
-          </p>
-          <Eye className="w-4 h-4 text-gray-300" />
-        </div>
-      </div>
+      </AccordionTrigger>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-4">
-        <QuoteMetric label="Tenue compta" value={quote.monthlyAccountingPrice} />
-        <QuoteMetric label="Clôture" value={quote.monthlyClosurePrice} />
-        <QuoteMetric label="Social" value={quote.monthlySocialPrice} />
-        <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
-          <p className="text-xs text-blue-600 font-medium">Total / mois</p>
-          <p className="text-base font-bold text-blue-700 mt-0.5">
-            {quote.totalMonthlyHT.toLocaleString('fr-FR')} €
-          </p>
+      {/* ── Content (detail) ── */}
+      <AccordionContent className="px-5 pb-5">
+        {/* Metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-4 pt-2">
+          <QuoteMetric label="Tenue compta" value={quote.monthlyAccountingPrice} />
+          <QuoteMetric label="Clôture" value={quote.monthlyClosurePrice} />
+          <QuoteMetric label="Social" value={quote.monthlySocialPrice} />
+          <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+            <p className="text-xs text-blue-600 font-medium">Total / mois</p>
+            <p className="text-base font-bold text-blue-700 mt-0.5">
+              {quote.totalMonthlyHT.toLocaleString('fr-FR')} €
+            </p>
+          </div>
         </div>
-      </div>
-      {quote.monthlyOptionsPrice > 0 && (
-        <p className="text-xs text-gray-500 mb-3">
-          Options incluses : +{quote.monthlyOptionsPrice} €/mois
-        </p>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
-        {!isValidated && (
-          <button
-            onClick={handleValidate}
-            disabled={validating}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-xs font-medium transition-colors"
-          >
-            {validating ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-            Valider pour Lettre de Mission
-          </button>
+        {quote.monthlyOptionsPrice > 0 && (
+          <p className="text-xs text-gray-500 mb-3">
+            Options incluses : +{quote.monthlyOptionsPrice} €/mois
+          </p>
         )}
 
-        <button
-          onClick={handleLinkToProspect}
-          disabled={linkingProspect}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 disabled:bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
-          title="Sauvegarder cette proposition dans le CRM (table prospects)"
-        >
-          {linkingProspect ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tag className="w-3 h-3" />}
-          Lier au Prospect CRM
-        </button>
+        {/* Options / services cochés */}
+        {(quote.bilanCompris || quote.rdvAtterrissage || quote.options.ticketsSupport5an || quote.options.whatsappDedie || quote.options.appelsPrioritaires || quote.options.assembleGenerale || quote.bulletinsPerMonth > 0) && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Services & options inclus</p>
+            <div className="flex flex-wrap gap-1.5">
+              {quote.bulletinsPerMonth > 0 && (
+                <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">{quote.bulletinsPerMonth} bulletin{quote.bulletinsPerMonth > 1 ? 's' : ''}/mois</span>
+              )}
+              {quote.bilanCompris && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">RDV bilan compris</span>}
+              {quote.rdvAtterrissage && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">RDV atterrissage</span>}
+              {quote.options.ticketsSupport5an && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">5 tickets support/an</span>}
+              {quote.options.whatsappDedie && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">WhatsApp dédié</span>}
+              {quote.options.appelsPrioritaires && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">Appels prioritaires</span>}
+              {quote.options.assembleGenerale && <span className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">Assemblée générale</span>}
+            </div>
+          </div>
+        )}
 
-        <button
-          onClick={() => onReExport(quote)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
-        >
-          <Download className="w-3 h-3" />
-          Télécharger / Ré-exporter
-        </button>
-
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors">
-              <Trash2 className="w-3 h-3" />
-              Supprimer
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+          {!isValidated && (
+            <button
+              onClick={handleValidate}
+              disabled={validating}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-xs font-medium transition-colors"
+            >
+              {validating ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+              Valider pour Lettre de Mission
             </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer cette proposition ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                La proposition de <strong>{quote.clientName}</strong> ({quote.totalMonthlyHT.toLocaleString('fr-FR')} €/mois HT)
-                sera définitivement supprimée de la base de données. Cette action est irréversible.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                Supprimer définitivement
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </div>
+          )}
+
+          <button
+            onClick={handleLinkToProspect}
+            disabled={linkingProspect}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 disabled:bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-medium transition-colors"
+            title="Sauvegarder cette proposition dans le CRM (table prospects)"
+          >
+            {linkingProspect ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tag className="w-3 h-3" />}
+            Lier au Prospect CRM
+          </button>
+
+          <button
+            onClick={() => onReExport(quote)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            <Download className="w-3 h-3" />
+            Télécharger / Ré-exporter
+          </button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition-colors">
+                <Trash2 className="w-3 h-3" />
+                Supprimer
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer cette proposition ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  La proposition de <strong>{quote.clientName}</strong> ({quote.totalMonthlyHT.toLocaleString('fr-FR')} €/mois HT)
+                  sera définitivement supprimée de la base de données. Cette action est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Supprimer définitivement
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -2471,11 +2500,13 @@ export function PricingEngine() {
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
                 Tableau de bord des propositions ({savedQuotes.length})
               </h2>
-              <div className="space-y-3">
-                {savedQuotes.map(q => (
-                  <SavedQuoteCard key={q.id} quote={q} onReExport={handleReExport} />
-                ))}
-              </div>
+              <ScrollArea className="max-h-[500px] pr-1">
+                <Accordion type="single" collapsible className="space-y-3">
+                  {savedQuotes.map(q => (
+                    <SavedQuoteCard key={q.id} quote={q} onReExport={handleReExport} />
+                  ))}
+                </Accordion>
+              </ScrollArea>
             </div>
           )}
         </main>
