@@ -1088,6 +1088,36 @@ export function Prospection() {
         ),
       }));
 
+      // --- DÉBUT DE L'AJOUT : AUTOMATISATION CRM ---
+      const nextActionDateObj = new Date(Date.now() + 7 * 86_400_000); // J+7
+      const newNextActionDate = nextActionDateObj.toISOString().split('T')[0];
+      const newEstimatedValue = quote.monthlyTotal * 12; // CA annualisé
+
+      const autoLog = `[${new Date().toLocaleString('fr-FR')}] Proposition v${quote.version} envoyée. Relance automatique planifiée le ${nextActionDateObj.toLocaleDateString('fr-FR')}.`;
+
+      setLeads(prev => prev.map(l =>
+        l.id === sheetId
+          ? {
+              ...l,
+              estimatedValue: newEstimatedValue,
+              nextActionDate: newNextActionDate,
+              callLogs: [...(l.callLogs ?? []), autoLog]
+            }
+          : l
+      ));
+
+      if (storeProspects.some(p => p.id === sheetId)) {
+        await updateProspectFields(sheetId, {
+          estimated_value: newEstimatedValue,
+          next_action_date: newNextActionDate,
+          call_logs: [...(lead.callLogs ?? []), autoLog]
+        });
+
+        setDraftEstimatedValue(String(newEstimatedValue));
+        setDraftNextActionDate(newNextActionDate);
+      }
+      // --- FIN DE L'AJOUT ---
+
       toast.success(`Devis ${versionLabel} envoyé à ${contactEmail} avec lien d'acceptation.`);
     } finally {
       setSendingQuoteId(null);
@@ -2267,6 +2297,7 @@ export function Prospection() {
                           placeholder="Ex : 5000"
                           value={draftEstimatedValue}
                           onChange={e => { setDraftEstimatedValue(e.target.value); setCrmSaved(false); }}
+                          onBlur={saveCrmFields}
                           className="w-full h-8 px-3 pr-8 border border-gray-200 rounded-lg text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">€</span>
@@ -2278,6 +2309,7 @@ export function Prospection() {
                         type="date"
                         value={draftNextActionDate}
                         onChange={e => { setDraftNextActionDate(e.target.value); setCrmSaved(false); }}
+                        onBlur={saveCrmFields}
                         className="w-full h-8 px-3 border border-gray-200 rounded-lg text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
                       />
                     </div>
