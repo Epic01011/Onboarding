@@ -1460,8 +1460,6 @@ export interface BalanceSheetRecord {
   assignedManager?: string;
   dueDate: string;             // ISO date — clôture + 4 mois (échéance légale)
   urgencySemantic: UrgencySemantic;
-  notes?: string;
-  syncedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1489,8 +1487,6 @@ export async function upsertBalanceSheet(
           assigned_manager: record.assignedManager ?? null,
           due_date: record.dueDate,
           urgency_semantic: record.urgencySemantic,
-          notes: record.notes ?? null,
-          synced_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,pennylane_id' }
@@ -1541,8 +1537,6 @@ export async function getBalanceSheets(
       assignedManager: (row.assigned_manager as string | null) ?? undefined,
       dueDate: row.due_date as string,
       urgencySemantic: (row.urgency_semantic as UrgencySemantic) ?? 'green',
-      notes: (row.notes as string | null) ?? undefined,
-      syncedAt: row.synced_at as string,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     }));
@@ -1566,15 +1560,15 @@ export async function updateBalanceSheetProduction(
     productionStep?: ProductionStep;
     assignedManager?: string;
     urgencySemantic?: UrgencySemantic;
-    notes?: string;
   }
 ): Promise<SyncResult> {
   try {
-    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const payload: Record<string, unknown> = {};
     if (updates.productionStep !== undefined) payload.production_step = updates.productionStep;
     if (updates.assignedManager !== undefined) payload.assigned_manager = updates.assignedManager;
     if (updates.urgencySemantic !== undefined) payload.urgency_semantic = updates.urgencySemantic;
-    if (updates.notes !== undefined) payload.notes = updates.notes;
+
+    if (Object.keys(payload).length === 0) return { success: true };
 
     const { error } = await supabase
       .from('balance_sheets')
