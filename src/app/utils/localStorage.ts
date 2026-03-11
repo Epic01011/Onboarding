@@ -1,7 +1,9 @@
-import { ClientData, StepStatus, defaultClientData } from '../context/OnboardingContext';
+import { ClientData, MissionType, StepStatus, defaultClientData } from '../context/OnboardingContext';
 
 export interface DossierData {
   id: string;
+  /** Native mission type — mirrors the `mission_type` column in `onboarding_cases`. */
+  missionType?: MissionType;
   clientData: ClientData;
   stepStatuses: StepStatus[];
   currentStep: number;

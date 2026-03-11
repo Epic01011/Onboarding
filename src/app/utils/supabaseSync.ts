@@ -16,6 +16,7 @@
  *     dossier_id   TEXT NOT NULL UNIQUE,
  *     step_id      TEXT NOT NULL DEFAULT 'collecte',
  *     status       TEXT NOT NULL DEFAULT 'draft',
+ *     mission_type TEXT CHECK (mission_type IN ('reprise', 'creation')),
  *     client_data  JSONB,
  *     step_statuses JSONB,
  *     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -42,6 +43,8 @@ export interface OnboardingCase {
   userId: string;
   stepId: string;
   status: 'draft' | 'in_progress' | 'completed' | 'archived';
+  /** Native column — mirrors `mission_type` in `onboarding_cases`. Values: 'reprise' | 'creation'. */
+  missionType?: 'reprise' | 'creation';
   clientData: Record<string, unknown>;
   stepStatuses: string[];
   updatedAt?: string;
@@ -74,6 +77,8 @@ export async function saveDraftCase(caseData: OnboardingCase): Promise<SyncResul
           user_id: caseData.userId,
           step_id: caseData.stepId,
           status: caseData.status,
+          // Native indexed column — derive from top-level missionType or clientData fallback
+          mission_type: caseData.missionType || (caseData.clientData.missionType as string) || null,
           client_data: caseData.clientData,
           step_statuses: caseData.stepStatuses,
           updated_at: new Date().toISOString(),
@@ -122,6 +127,7 @@ export async function getDraftCase(
         userId: data.user_id as string,
         stepId: data.step_id as string,
         status: data.status as OnboardingCase['status'],
+        missionType: (data.mission_type as OnboardingCase['missionType']) ?? undefined,
         clientData: (data.client_data as Record<string, unknown>) ?? {},
         stepStatuses: (data.step_statuses as string[]) ?? [],
         updatedAt: data.updated_at as string,

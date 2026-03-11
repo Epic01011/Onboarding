@@ -358,7 +358,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                 <RefreshCw className="w-5 h-5 text-indigo-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">Onboarding &amp; Reprise</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">Onboarding & Reprise</p>
                 <p className="text-xs text-slate-400 truncate">Clients existants (SIREN)</p>
               </div>
             </button>
