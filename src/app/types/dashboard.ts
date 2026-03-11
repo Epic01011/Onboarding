@@ -145,6 +145,12 @@ export interface FiscalTask {
   updated_at: string;
   /** Bidirectional sync metadata (Impôts.gouv / Pennylane) */
   sync?: SyncMetadata;
+  /** True when data has been certified directly by the DGFIP portal */
+  is_dgfip_certified?: boolean;
+  /** True when a discrepancy is detected between accounting data (e.g. Pennylane) and DGFIP fiscal accounts */
+  mismatch_alert?: boolean;
+  /** Download URL for the tax compliance certificate (attestation de régularité fiscale) */
+  tax_compliance_certificate_url?: string;
 }
 
 // ─── AI Email Draft (RAG BOFiP) ──────────────────────────────────────────────
