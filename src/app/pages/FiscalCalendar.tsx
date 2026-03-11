@@ -316,7 +316,7 @@ function MatrixCell({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-/** Simple CSV/Excel export — downloads tasks as a .csv file */
+/** Simple CSV/Excel export — downloads tasks as a .csv file with UTF-8 BOM for Excel compatibility */
 function exportToExcel(tasks: FiscalTask[]): void {
   const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const header = ['Client', 'Type', 'Échéance', 'Statut', 'Urgence', 'DGFIP certifié', 'Discordance'];
@@ -329,7 +329,9 @@ function exportToExcel(tasks: FiscalTask[]): void {
     t.is_dgfip_certified ? 'Oui' : 'Non',
     t.mismatch_alert ? 'Oui' : 'Non',
   ]);
-  const csv = [header.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
+  // UTF-8 BOM ensures accented characters display correctly in Excel
+  const bom = '\uFEFF';
+  const csv = bom + [header.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -339,15 +341,25 @@ function exportToExcel(tasks: FiscalTask[]): void {
   URL.revokeObjectURL(url);
 }
 
+/** Escapes all HTML special characters to prevent XSS in generated HTML output */
+function escHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 /** Opens a print-ready window with the full fiscal schedule for PDF saving */
 function openPrintPreview(tasks: FiscalTask[]): void {
   const rows = tasks
     .map(t =>
       `<tr>
-        <td>${t.client_name.replace(/</g, '&lt;')}</td>
-        <td>${t.task_type}</td>
-        <td>${t.due_date.slice(0, 10)}</td>
-        <td>${t.status}</td>
+        <td>${escHtml(t.client_name)}</td>
+        <td>${escHtml(t.task_type)}</td>
+        <td>${escHtml(t.due_date.slice(0, 10))}</td>
+        <td>${escHtml(t.status)}</td>
         <td>${t.is_dgfip_certified ? '✓' : '—'}</td>
         <td>${t.mismatch_alert ? '⚠' : '—'}</td>
       </tr>`,
@@ -356,7 +368,7 @@ function openPrintPreview(tasks: FiscalTask[]): void {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Échéancier fiscal</title>
     <style>body{font-family:sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}
     th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f3f4f6}</style></head>
-    <body><h2>Échéancier fiscal DGFIP — ${new Date().toLocaleDateString('fr-FR')}</h2>
+    <body><h2>Échéancier fiscal DGFIP — ${escHtml(new Date().toLocaleDateString('fr-FR'))}</h2>
     <table><thead><tr><th>Client</th><th>Type</th><th>Échéance</th><th>Statut</th>
     <th>Certifié DGFIP</th><th>Discordance</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
   const w = window.open('', '_blank');

@@ -4,15 +4,17 @@
  * Service de synchronisation bidirectionnelle avec le portail impots.gouv.fr (DGFIP).
  *
  * Provides:
- *   - syncFiscalDeadlines()         : fetch real-time fiscal deadlines from DGFIP
- *   - requestTaxCertificate(clientId): order and retrieve a tax compliance certificate
+ *   - syncFiscalDeadlines()           : fetch real-time fiscal deadlines from DGFIP
+ *   - requestTaxCertificate(clientId) : order and retrieve a tax compliance certificate
+ *   - validateDgfipConnection()       : test the connection to the configured DGFIP webhook
  *
- * Falls back gracefully when the DGFIP API / n8n webhook is not configured
- * (demo mode — no credentials needed).
+ * Connection configuration is read from the `impotsgouv` entry in servicesStorage
+ * (LocalStorage → Supabase). Falls back gracefully to environment variables, then
+ * demo mode when neither is configured.
  */
 
 import { FiscalTask } from '../types/dashboard';
-import { apiClient, ApiError } from '../utils/apiClient';
+import { getServiceConnections } from '../utils/servicesStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,60 @@ export interface TaxCertificateResult {
   issued_at: string;
 }
 
+export interface DGFIPConnectionStatus {
+  /** true when the webhook responds with a 2xx status */
+  ok: boolean;
+  /** Human-readable status message */
+  message: string;
+  /** ISO timestamp of the test */
+  tested_at: string;
+  /** Latency in milliseconds (–1 when not available) */
+  latency_ms: number;
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Resolves the base webhook URL and API key to use for DGFIP calls.
+ * Priority:
+ *   1. `impotsgouv` connection stored in servicesStorage (user-configured)
+ *   2. VITE_N8N_WEBHOOK_URL / VITE_N8N_API_KEY env vars
+ *   3. Empty string → demo mode (no real calls)
+ */
+function resolveDgfipConfig(): { baseUrl: string; apiKey: string } {
+  const stored = getServiceConnections().impotsgouv;
+  if (stored.connected && stored.webhookUrl) {
+    return {
+      baseUrl: stored.webhookUrl.replace(/\/$/, ''),
+      apiKey: stored.apiKey ?? '',
+    };
+  }
+  return {
+    baseUrl: (import.meta.env.VITE_N8N_WEBHOOK_URL ?? '').replace(/\/$/, ''),
+    apiKey: import.meta.env.VITE_N8N_API_KEY ?? '',
+  };
+}
+
+/** Performs a single POST request against the DGFIP n8n webhook. */
+async function dgfipFetch<T>(path: string, body: unknown, config: { baseUrl: string; apiKey: string }): Promise<T> {
+  const url = `${config.baseUrl}${path}`;
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(config.apiKey ? { 'x-api-key': config.apiKey } : {}),
+  };
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`DGFIP webhook error ${response.status}: ${text}`);
+  }
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
 // ─── DGFIP Fiscal deadline sync ──────────────────────────────────────────────
 
 /**
@@ -46,10 +102,15 @@ export interface TaxCertificateResult {
  * sans lever d'erreur — le calendrier fiscal garde ses données de démo.
  */
 export async function syncFiscalDeadlines(): Promise<DGFIPSyncResult> {
+  const config = resolveDgfipConfig();
+  if (!config.baseUrl) {
+    return { tasks: [], synced_at: new Date().toISOString(), is_live: false };
+  }
   try {
-    const result = await apiClient.post<DGFIPSyncResult>(
+    const result = await dgfipFetch<DGFIPSyncResult>(
       '/webhook/dgfip/sync-deadlines',
       { requested_at: new Date().toISOString() },
+      config,
     );
     return {
       ...result,
@@ -57,15 +118,8 @@ export async function syncFiscalDeadlines(): Promise<DGFIPSyncResult> {
       synced_at: result.synced_at ?? new Date().toISOString(),
     };
   } catch (err) {
-    if (err instanceof ApiError) {
-      // Webhook not configured or DGFIP unreachable — silently fall back
-      console.warn('[dgfipApi] syncFiscalDeadlines fallback (demo mode):', err.message);
-    }
-    return {
-      tasks: [],
-      synced_at: new Date().toISOString(),
-      is_live: false,
-    };
+    console.warn('[dgfipApi] syncFiscalDeadlines fallback (demo mode):', err instanceof Error ? err.message : err);
+    return { tasks: [], synced_at: new Date().toISOString(), is_live: false };
   }
 }
 
@@ -81,18 +135,22 @@ export async function syncFiscalDeadlines(): Promise<DGFIPSyncResult> {
  * @returns URL de téléchargement de l'attestation et horodatage d'émission
  */
 export async function requestTaxCertificate(clientId: string): Promise<TaxCertificateResult> {
+  const config = resolveDgfipConfig();
+  if (!config.baseUrl) {
+    return {
+      client_id: clientId,
+      certificate_url: `#demo-attestation-${clientId}`,
+      issued_at: new Date().toISOString(),
+    };
+  }
   try {
-    const result = await apiClient.post<TaxCertificateResult>(
+    return await dgfipFetch<TaxCertificateResult>(
       '/webhook/dgfip/tax-certificate',
       { client_id: clientId, requested_at: new Date().toISOString() },
+      config,
     );
-    return result;
   } catch (err) {
-    if (err instanceof ApiError) {
-      // Webhook not configured — return a demo fallback URL
-      console.warn('[dgfipApi] requestTaxCertificate fallback (demo mode):', err.message);
-    }
-    // Demo mode: return a placeholder certificate URL
+    console.warn('[dgfipApi] requestTaxCertificate fallback (demo mode):', err instanceof Error ? err.message : err);
     return {
       client_id: clientId,
       certificate_url: `#demo-attestation-${clientId}`,
@@ -100,3 +158,73 @@ export async function requestTaxCertificate(clientId: string): Promise<TaxCertif
     };
   }
 }
+
+// ─── Connection validation ────────────────────────────────────────────────────
+
+/**
+ * Vérifie que le webhook DGFIP configuré est joignable et répond correctement.
+ *
+ * Appelle l'endpoint `/webhook/dgfip/health` (ou `/webhook/dgfip/sync-deadlines`
+ * avec un flag de test). Retourne le statut de connexion, le message et la latence.
+ *
+ * En mode démonstration (aucun webhook configuré), indique clairement que la
+ * connexion n'est pas configurée — sans lever d'erreur.
+ *
+ * @param override - Optional config to test without persisting to storage (used by the settings modal)
+ */
+export async function validateDgfipConnection(override?: { baseUrl: string; apiKey: string }): Promise<DGFIPConnectionStatus> {
+  const config = override ?? resolveDgfipConfig();
+  const tested_at = new Date().toISOString();
+
+  if (!config.baseUrl) {
+    return {
+      ok: false,
+      message: "Aucun webhook DGFIP configuré. Renseignez l'URL dans les paramètres → Intégrations → DGFIP.",
+      tested_at,
+      latency_ms: -1,
+    };
+  }
+
+  const t0 = Date.now();
+  try {
+    // First try the dedicated health endpoint
+    const healthUrl = `${config.baseUrl}/webhook/dgfip/health`;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(config.apiKey ? { 'x-api-key': config.apiKey } : {}),
+    };
+    const response = await fetch(healthUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ test: true, requested_at: tested_at }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const latency_ms = Date.now() - t0;
+
+    if (response.ok) {
+      return {
+        ok: true,
+        message: `Connexion DGFIP opérationnelle (${latency_ms} ms) — impots.gouv.fr synchronisé via n8n.`,
+        tested_at,
+        latency_ms,
+      };
+    }
+
+    return {
+      ok: false,
+      message: `Le webhook DGFIP a répondu avec le code ${response.status}. Vérifiez la configuration n8n.`,
+      tested_at,
+      latency_ms,
+    };
+  } catch (err) {
+    const latency_ms = Date.now() - t0;
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      message: `Impossible de joindre le webhook DGFIP : ${msg}`,
+      tested_at,
+      latency_ms,
+    };
+  }
+}
+

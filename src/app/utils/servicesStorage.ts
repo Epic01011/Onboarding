@@ -15,6 +15,8 @@ export interface ServiceConnection {
   appPassword?: string;
   // Google Drive / SharePoint document storage
   folderId?: string;
+  // Webhook-based services (e.g. DGFIP / impots.gouv via n8n)
+  webhookUrl?: string;
 }
 
 export interface ServiceConnections {
@@ -29,6 +31,8 @@ export interface ServiceConnections {
   hubspot: ServiceConnection;
   pipedrive: ServiceConnection;
   pappers: ServiceConnection;
+  /** Portail Impôts.gouv (DGFIP) — synchronisation via n8n webhook */
+  impotsgouv: ServiceConnection;
 }
 
 export type AiProvider = 'claude' | 'openai' | 'perplexity';
@@ -70,6 +74,7 @@ export const defaultConnections: ServiceConnections = {
   hubspot: { connected: false },
   pipedrive: { connected: false },
   pappers: { connected: false },
+  impotsgouv: { connected: false },
 };
 
 export const defaultCabinetInfo: CabinetInfo = {
@@ -106,6 +111,7 @@ export function getServiceConnections(): ServiceConnections {
       hubspot: { ...defaultConnections.hubspot, ...parsed.hubspot },
       pipedrive: { ...defaultConnections.pipedrive, ...parsed.pipedrive },
       pappers: { ...defaultConnections.pappers, ...parsed.pappers },
+      impotsgouv: { ...defaultConnections.impotsgouv, ...parsed.impotsgouv },
     };
   } catch {
     return { ...defaultConnections };

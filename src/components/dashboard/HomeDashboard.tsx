@@ -246,7 +246,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
       ...mismatchTasks.slice(0, 3).map(t => ({
         icon: <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />,
         text: `Discordance DGFIP — ${t.client_name}`,
-        sub: `${t.task_type} · échéance ${t.due_date.slice(0, 10)}`,
+        sub: `${t.task_type} · échéance ${new Date(t.due_date).toLocaleDateString('fr-FR')}`,
         urgent: true,
       })),
       ...certTasks.slice(0, 3).map(t => ({
