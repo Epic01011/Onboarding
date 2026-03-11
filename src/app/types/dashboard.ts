@@ -125,6 +125,14 @@ export type FiscalTaskStatus =
 
 export type UrgencySemantic = 'green' | 'orange' | 'red';
 
+/** Production step for BILAN tasks, mirrored from Pennylane accounting year status. */
+export type ProductionStep =
+  | 'not_started'
+  | 'data_collection'
+  | 'revision'
+  | 'final_review'
+  | 'certified';
+
 /** Represents a fiscal/social obligation in the calendar. */
 export interface FiscalTask {
   id: string;
@@ -151,6 +159,14 @@ export interface FiscalTask {
   mismatch_alert?: boolean;
   /** Download URL for the tax compliance certificate (attestation de régularité fiscale) */
   tax_compliance_certificate_url?: string;
+
+  // ── BILAN-specific fields (populated via Pennylane sync) ──────────────────
+  /** ISO date of the fiscal year closing (from Pennylane) — BILAN tasks only */
+  closing_date?: string;
+  /** Current production step for balance sheet preparation — BILAN tasks only */
+  production_step?: ProductionStep;
+  /** Collaborateur assigned to coordinate the balance sheet — BILAN tasks only */
+  assigned_manager?: string;
 }
 
 // ─── AI Email Draft (RAG BOFiP) ──────────────────────────────────────────────

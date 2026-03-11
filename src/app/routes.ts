@@ -158,6 +158,13 @@ export const router = createBrowserRouter([
           return { Component: EmailEnginePage };
         },
       },
+      {
+        path: "balance-sheet",
+        lazy: async () => {
+          const { BalanceSheetTracker } = await import('./pages/BalanceSheetTracker');
+          return { Component: BalanceSheetTracker };
+        },
+      },
     ],
   },
   // Public route — client portal (magic link)

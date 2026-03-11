@@ -10,6 +10,7 @@ import {
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, BookOpen, Handshake,
   HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert,
+  HardDrive, Send, Zap, ChevronDown, AtSign, TrendingUp,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -64,6 +65,11 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
   const { dossiers, createDossier, loading } = useDossiersContext();
   const [creatingDossier, setCreatingDossier] = useState(false);
   const { fiscalTasks } = useDashboardStore();
+  const {
+    balanceSheets,
+    syncingBalanceSheets,
+    syncBalanceSheetData,
+  } = useDashboardStore();
 
   const kpis = useMemo(() => {
     const now = Date.now();
@@ -314,7 +320,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
           <p className="text-sm text-muted-foreground mt-1 capitalize">{TODAY}</p>
         </div>
         <button
-          onClick={() => setShowNewDossierModal(true)}
+          onClick={() => navigate('/dossiers-actifs')}
           disabled={creatingDossier}
           className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-60 self-start sm:self-auto"
         >
@@ -655,6 +661,52 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               <Plus className="w-4 h-4 text-teal-600" />
             </button>
           </div>
+        </div>
+
+        {/* ── Suivi des Bilans card (full width) ──────────────────────────────── */}
+        <div className={`flex items-center gap-4 rounded-xl border p-4 hover:shadow-md transition-all ${
+          balanceSheets.length > 0
+            ? 'bg-indigo-50 border-indigo-200'
+            : 'bg-white border-slate-200/60'
+        }`}>
+          <button
+            onClick={() => navigate('/balance-sheet')}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          >
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              balanceSheets.length > 0 ? 'bg-indigo-100' : 'bg-indigo-50'
+            }`}>
+              <TrendingUp className={`w-5 h-5 ${balanceSheets.length > 0 ? 'text-indigo-700' : 'text-indigo-500'}`} />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold truncate ${balanceSheets.length > 0 ? 'text-indigo-900' : 'text-gray-900'}`}>
+                Suivi des Bilans
+              </p>
+              {balanceSheets.length > 0 ? (() => {
+                const certified = balanceSheets.filter(s => s.productionStep === 'certified').length;
+                const total = balanceSheets.length;
+                const pct = Math.round((certified / total) * 100);
+                return (
+                  <p className="text-xs text-indigo-600 truncate">
+                    {certified}/{total} certifiés — {pct}% avancement période fiscale
+                  </p>
+                );
+              })() : (
+                <p className="text-xs text-slate-400 truncate">
+                  Planning de production — Pennylane
+                </p>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); syncBalanceSheetData(); }}
+            disabled={syncingBalanceSheets}
+            title="Actualiser Pennylane"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 disabled:opacity-50 text-indigo-700 text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncingBalanceSheets ? 'animate-spin' : ''}`} />
+            {syncingBalanceSheets ? 'Sync…' : 'Actualiser Pennylane'}
+          </button>
         </div>
       </div>
 
