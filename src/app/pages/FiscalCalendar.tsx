@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   RefreshCw,
@@ -12,6 +12,10 @@ import {
   CloudOff,
   CloudLightning,
   Cloud,
+  ShieldCheck,
+  Download,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { useDashboardStore } from '../store/useDashboardStore';
 import { FiscalTask, FiscalTaskStatus, FiscalTaskType, SyncStatus } from '../types/dashboard';
@@ -25,6 +29,8 @@ import {
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { useFiscalAlerts } from '../hooks/useFiscalAlerts';
+import { requestTaxCertificate } from '../services/dgfipApi';
+import { toast } from 'sonner';
 
 // ─── Task-type columns ────────────────────────────────────────────────────────
 
@@ -122,22 +128,22 @@ function buildDemoTasks(): FiscalTask[] {
 
   return [
     // SARL Dupont & Fils
-    { id: 'd01', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'TVA_CA3',        due_date: d(5),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'synced',        last_synced_at: iso } },
-    { id: 'd02', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'CFE',            due_date: d(5),  status: 'waiting_docs', urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_push',  last_synced_at: iso } },
+    { id: 'd01', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'TVA_CA3',        due_date: d(5),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'synced',        last_synced_at: iso }, is_dgfip_certified: true,  mismatch_alert: false },
+    { id: 'd02', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'CFE',            due_date: d(5),  status: 'waiting_docs', urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_push',  last_synced_at: iso }, is_dgfip_certified: false, mismatch_alert: true,  tax_compliance_certificate_url: '#demo-attestation-c1' },
     { id: 'd03', client_id: 'c1', client_name: 'SARL Dupont & Fils',   task_type: 'DSN',            due_date: d(3),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso },
     // SAS Technova
-    { id: 'd04', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'IS_Acompte',     due_date: d(14), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso } },
+    { id: 'd04', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'IS_Acompte',     due_date: d(14), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso }, is_dgfip_certified: true,  mismatch_alert: false },
     { id: 'd05', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'TVA_CA3',        due_date: d(14), status: 'ready',        urgency_semantic: 'orange', updated_at: iso },
-    { id: 'd06', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'PAIE',           due_date: d(6),  status: 'declared',     urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso } },
+    { id: 'd06', client_id: 'c2', client_name: 'SAS Technova',         task_type: 'PAIE',           due_date: d(6),  status: 'declared',     urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'synced',        last_synced_at: iso }, is_dgfip_certified: true },
     // EURL Martin Conseil
     { id: 'd07', client_id: 'c3', client_name: 'EURL Martin Conseil',  task_type: 'DSN',            due_date: d(14), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
     { id: 'd08', client_id: 'c3', client_name: 'EURL Martin Conseil',  task_type: 'TVA_CA12',       due_date: d(45), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
     // SA Bâtiment Pro
-    { id: 'd09', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'LIASSE_FISCALE', due_date: d(30), status: 'ready',        urgency_semantic: 'green',  updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'conflict',      last_synced_at: iso } },
+    { id: 'd09', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'LIASSE_FISCALE', due_date: d(30), status: 'ready',        urgency_semantic: 'green',  updated_at: iso, sync: { source: 'impots_gouv', sync_status: 'conflict',      last_synced_at: iso }, mismatch_alert: true },
     { id: 'd10', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'IS_Solde',       due_date: d(30), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
     { id: 'd11', client_id: 'c4', client_name: 'SA Bâtiment Pro',      task_type: 'BILAN',          due_date: d(35), status: 'preparation',  urgency_semantic: 'green',  updated_at: iso },
     // SASU WebAgency
-    { id: 'd12', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'TVA_CA3',        due_date: d(60), status: 'declared',     urgency_semantic: 'green',  updated_at: iso },
+    { id: 'd12', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'TVA_CA3',        due_date: d(60), status: 'declared',     urgency_semantic: 'green',  updated_at: iso, is_dgfip_certified: true, tax_compliance_certificate_url: '#demo-attestation-c5' },
     { id: 'd13', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'PAIE',           due_date: d(7),  status: 'ready',        urgency_semantic: 'red',    updated_at: iso },
     { id: 'd14', client_id: 'c5', client_name: 'SASU WebAgency',       task_type: 'DAS2',           due_date: d(20), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
     // SC Immobilière Sud
@@ -147,7 +153,7 @@ function buildDemoTasks(): FiscalTask[] {
     { id: 'd17', client_id: 'c7', client_name: 'SCI Les Oliviers',     task_type: 'LIASSE_FISCALE', due_date: d(15), status: 'waiting_docs', urgency_semantic: 'orange', updated_at: iso },
     { id: 'd18', client_id: 'c7', client_name: 'SCI Les Oliviers',     task_type: 'IS_Acompte',     due_date: d(20), status: 'preparation',  urgency_semantic: 'orange', updated_at: iso },
     // AE Moreau Consulting
-    { id: 'd19', client_id: 'c8', client_name: 'AE Moreau Consulting', task_type: 'TVA_CA3',        due_date: d(7),  status: 'ready',        urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_pull',  last_synced_at: iso } },
+    { id: 'd19', client_id: 'c8', client_name: 'AE Moreau Consulting', task_type: 'TVA_CA3',        due_date: d(7),  status: 'ready',        urgency_semantic: 'red',    updated_at: iso, sync: { source: 'pennylane',   sync_status: 'pending_pull',  last_synced_at: iso }, is_dgfip_certified: true,  mismatch_alert: false },
     { id: 'd20', client_id: 'c8', client_name: 'AE Moreau Consulting', task_type: 'CVAE',           due_date: d(7),  status: 'preparation',  urgency_semantic: 'red',    updated_at: iso },
   ];
 }
@@ -245,9 +251,32 @@ function MatrixCell({
   const dl = daysLeft(task.due_date);
   const next = STATUS_NEXT[task.status];
 
+  // Mismatch alert: pulsing red border overrides normal background
+  const baseCellClass = 'text-center p-1.5';
+  const cellClass = task.mismatch_alert
+    ? `${baseCellClass} border-2 border-red-500 animate-pulse ${cellBg(task)}`
+    : `${baseCellClass} border border-gray-100 ${cellBg(task)}`;
+
   return (
-    <TableCell className={`text-center p-1.5 border border-gray-100 ${cellBg(task)}`}>
+    <TableCell className={cellClass}>
       <div className="flex flex-col items-center gap-0.5">
+        {/* DGFIP certification badge */}
+        {task.is_dgfip_certified && (
+          <span title="Donnée certifiée DGFIP">
+            <ShieldCheck className="w-3 h-3 text-blue-500" aria-label="Donnée certifiée DGFIP" />
+          </span>
+        )}
+
+        {/* Mismatch alert tooltip indicator */}
+        {task.mismatch_alert && (
+          <span
+            title="Discordance détectée — données comptables ≠ DGFIP"
+            className="text-[9px] font-bold text-red-600 leading-none"
+          >
+            ⚠
+          </span>
+        )}
+
         {/* Status badge */}
         <span
           className={`inline-block text-[10px] font-semibold rounded px-1.5 py-0.5 leading-tight ${badgeClasses(task)}`}
@@ -287,6 +316,65 @@ function MatrixCell({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+/** Simple CSV/Excel export — downloads tasks as a .csv file with UTF-8 BOM for Excel compatibility */
+function exportToExcel(tasks: FiscalTask[]): void {
+  const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const header = ['Client', 'Type', 'Échéance', 'Statut', 'Urgence', 'DGFIP certifié', 'Discordance'];
+  const rows = tasks.map(t => [
+    escCsv(t.client_name),
+    escCsv(t.task_type),
+    escCsv(t.due_date.slice(0, 10)),
+    escCsv(t.status),
+    escCsv(t.urgency_semantic),
+    t.is_dgfip_certified ? 'Oui' : 'Non',
+    t.mismatch_alert ? 'Oui' : 'Non',
+  ]);
+  // UTF-8 BOM ensures accented characters display correctly in Excel
+  const bom = '\uFEFF';
+  const csv = bom + [header.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `echeancier-fiscal-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Escapes all HTML special characters to prevent XSS in generated HTML output */
+function escHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+/** Opens a print-ready window with the full fiscal schedule for PDF saving */
+function openPrintPreview(tasks: FiscalTask[]): void {
+  const rows = tasks
+    .map(t =>
+      `<tr>
+        <td>${escHtml(t.client_name)}</td>
+        <td>${escHtml(t.task_type)}</td>
+        <td>${escHtml(t.due_date.slice(0, 10))}</td>
+        <td>${escHtml(t.status)}</td>
+        <td>${t.is_dgfip_certified ? '✓' : '—'}</td>
+        <td>${t.mismatch_alert ? '⚠' : '—'}</td>
+      </tr>`,
+    )
+    .join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Échéancier fiscal</title>
+    <style>body{font-family:sans-serif;font-size:11px}table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ccc;padding:4px 8px}th{background:#f3f4f6}</style></head>
+    <body><h2>Échéancier fiscal DGFIP — ${escHtml(new Date().toLocaleDateString('fr-FR'))}</h2>
+    <table><thead><tr><th>Client</th><th>Type</th><th>Échéance</th><th>Statut</th>
+    <th>Certifié DGFIP</th><th>Discordance</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); w.print(); }
+}
+
 export function FiscalCalendar() {
   const navigate = useNavigate();
   const {
@@ -296,6 +384,8 @@ export function FiscalCalendar() {
     updateFiscalTaskStatus,
     refreshUrgencies,
   } = useDashboardStore();
+
+  const [downloadingCert, setDownloadingCert] = useState<string | null>(null);
 
   const displayTasks: FiscalTask[] =
     fiscalTasks.length > 0 ? fiscalTasks : buildDemoTasks();
@@ -311,6 +401,24 @@ export function FiscalCalendar() {
     const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
   }, [refreshUrgencies]);
+
+  /** Download attestation for a given client — calls DGFIP service */
+  const handleDownloadAttestation = useCallback(async (clientId: string, clientName: string) => {
+    setDownloadingCert(clientId);
+    try {
+      const result = await requestTaxCertificate(clientId);
+      if (result.certificate_url.startsWith('#demo')) {
+        toast.info(`Attestation ${clientName} : mode démonstration (URL factice).`);
+      } else {
+        window.open(result.certificate_url, '_blank');
+        toast.success(`Attestation de régularité fiscale téléchargée pour ${clientName}`);
+      }
+    } catch {
+      toast.error(`Impossible de télécharger l'attestation pour ${clientName}`);
+    } finally {
+      setDownloadingCert(null);
+    }
+  }, []);
 
   // Build matrix: clientId → { taskType → task }
   const clientOrder: string[] = [];
@@ -340,6 +448,12 @@ export function FiscalCalendar() {
     });
   }
 
+  /** Whether a client has at least one task with a compliance certificate */
+  const clientHasCert = (clientId: string): boolean =>
+    Object.values(matrix[clientId] ?? {}).some(
+      t => t?.tax_compliance_certificate_url || t?.is_dgfip_certified,
+    );
+
   return (
     <div className="p-6 min-h-screen bg-gray-50/40">
       {/* Back navigation */}
@@ -356,13 +470,27 @@ export function FiscalCalendar() {
       {/* Page header */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Calendrier fiscal 2026</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            Module Suivi des échéances fiscales — Intégration DGFIP
+          </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Vue matricielle — obligations par client × échéance déclarative
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* DGFIP legend */}
+          <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-blue-500" />
+              <span>Certifié DGFIP</span>
+            </div>
+            <div className="flex items-center gap-1 text-red-600 font-semibold">
+              <span>⚠</span>
+              <span>Discordance</span>
+            </div>
+          </div>
+
           {/* Urgency legend */}
           <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
             <div className="flex items-center gap-1">
@@ -386,6 +514,25 @@ export function FiscalCalendar() {
             <CloudOff className="w-3 h-3 text-red-400" /><span>Conflit</span>
           </div>
 
+          {/* Export buttons */}
+          <button
+            onClick={() => exportToExcel(displayTasks)}
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+            title="Exporter l'échéancier en Excel (CSV)"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Export Excel
+          </button>
+
+          <button
+            onClick={() => openPrintPreview(displayTasks)}
+            className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+            title="Ouvrir l'aperçu d'impression pour l'échéancier"
+          >
+            <FileText className="w-4 h-4" />
+            Export PDF
+          </button>
+
           <button
             onClick={() => fetchFiscalTasks()}
             disabled={loadingFiscalTasks}
@@ -407,7 +554,7 @@ export function FiscalCalendar() {
             <TableHeader>
               <TableRow className="bg-gray-50 hover:bg-gray-50">
                 {/* Sticky client-name header */}
-                <TableHead className="sticky left-0 z-20 bg-gray-50 border border-gray-200 min-w-44 max-w-52 font-semibold text-gray-700 text-xs">
+                <TableHead className="sticky left-0 z-20 bg-gray-50 border border-gray-200 min-w-52 max-w-64 font-semibold text-gray-700 text-xs">
                   Client
                 </TableHead>
 
@@ -439,13 +586,29 @@ export function FiscalCalendar() {
                       : 'bg-gray-50/30 hover:bg-gray-50/60'
                   }
                 >
-                  {/* Sticky client name */}
+                  {/* Sticky client name + attestation button */}
                   <TableCell
-                    className="sticky left-0 z-10 border border-gray-200 font-medium text-gray-800 text-xs px-3 py-2 min-w-44 max-w-52 truncate"
+                    className="sticky left-0 z-10 border border-gray-200 text-xs px-3 py-2 min-w-52 max-w-64"
                     style={{ background: rowIdx % 2 === 0 ? '#ffffff' : '#f9fafb' }}
-                    title={clientNames[clientId]}
                   >
-                    {clientNames[clientId]}
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-medium text-gray-800 truncate" title={clientNames[clientId]}>
+                        {clientNames[clientId]}
+                      </span>
+                      {/* Attestation download button — shown when client has DGFIP data */}
+                      {clientHasCert(clientId) && (
+                        <button
+                          onClick={() => handleDownloadAttestation(clientId, clientNames[clientId])}
+                          disabled={downloadingCert === clientId}
+                          title="Télécharger l'attestation de régularité fiscale"
+                          className="flex-shrink-0 flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1 py-0.5 transition-colors disabled:opacity-60"
+                          aria-label="Télécharger Attestation de Régularité"
+                        >
+                          <Download className="w-2.5 h-2.5" />
+                          Attestation
+                        </button>
+                      )}
+                    </div>
                   </TableCell>
 
                   {/* One cell per task type */}

@@ -9,6 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, BookOpen, Handshake,
+  HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert,
   HardDrive, Send, Zap, ChevronDown, AtSign, TrendingUp,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
@@ -37,6 +38,13 @@ type Blocker = {
   clientNom: string;
 };
 
+interface DgfipNotificationItem {
+  icon: React.ReactNode;
+  text: string;
+  sub: string;
+  urgent: boolean;
+}
+
 interface HomeDashboardProps {
   /** Pre-loaded signed clients passed from parent to avoid duplicate API calls. */
   signedClients?: SignedClient[];
@@ -56,6 +64,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
   const navigate = useNavigate();
   const { dossiers, createDossier, loading } = useDossiersContext();
   const [creatingDossier, setCreatingDossier] = useState(false);
+  const { fiscalTasks } = useDashboardStore();
   const {
     balanceSheets,
     syncingBalanceSheets,
@@ -180,6 +189,117 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
       setCreatingDossier(false);
     }
   };
+
+  // ── Santé Fiscale DGFIP ─────────────────────────────────────────────────────
+
+  const fiscalHealthKpi = useMemo(() => {
+    const allTasks = fiscalTasks;
+    if (allTasks.length === 0) return null;
+
+    const certified = allTasks.filter(t => t.is_dgfip_certified).length;
+    const pct = Math.round((certified / allTasks.length) * 100);
+    const hasMismatch = allTasks.some(t => t.mismatch_alert);
+    const isHealthy = pct >= 80 && !hasMismatch;
+
+    return (
+      <div className={`rounded-2xl border p-4 shadow-sm flex items-center gap-4 ${
+        isHealthy
+          ? 'bg-gradient-to-r from-emerald-50 to-blue-50 border-emerald-200/60'
+          : 'bg-gradient-to-r from-amber-50 to-red-50 border-amber-200/60'
+      }`}>
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          isHealthy ? 'bg-emerald-100' : 'bg-amber-100'
+        }`}>
+          {isHealthy
+            ? <ShieldCheck className="w-6 h-6 text-emerald-600" />
+            : <ShieldAlert className="w-6 h-6 text-amber-600" />
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-semibold ${isHealthy ? 'text-emerald-800' : 'text-amber-800'}`}>
+            Santé Fiscale DGFIP
+          </p>
+          <p className={`text-2xl font-bold ${isHealthy ? 'text-emerald-900' : 'text-amber-900'}`}>
+            {pct} % <span className="text-sm font-normal">tâches à jour</span>
+          </p>
+          <p className={`text-xs mt-0.5 ${isHealthy ? 'text-emerald-600' : 'text-amber-700'}`}>
+            {certified} / {allTasks.length} tâches certifiées DGFIP
+            {hasMismatch && ' · ⚠ Discordances détectées'}
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/fiscal-calendar')}
+          className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+            isHealthy
+              ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
+              : 'bg-amber-100 hover:bg-amber-200 text-amber-700'
+          }`}
+        >
+          Détails <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }, [fiscalTasks, navigate]);
+
+  // ── DGFIP Notifications widget ──────────────────────────────────────────────
+
+  const dgfipNotifications = useMemo(() => {
+    const mismatchTasks = fiscalTasks.filter(t => t.mismatch_alert);
+    const certTasks = fiscalTasks.filter(t => t.is_dgfip_certified && t.status !== 'declared');
+    if (mismatchTasks.length === 0 && certTasks.length === 0) return null;
+
+    const items: DgfipNotificationItem[] = [
+      ...mismatchTasks.slice(0, 3).map(t => ({
+        icon: <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />,
+        text: `Discordance DGFIP — ${t.client_name}`,
+        sub: `${t.task_type} · échéance ${new Date(t.due_date).toLocaleDateString('fr-FR')}`,
+        urgent: true,
+      })),
+      ...certTasks.slice(0, 3).map(t => ({
+        icon: <ShieldCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />,
+        text: `Certifié DGFIP — ${t.client_name}`,
+        sub: `${t.task_type} · en cours`,
+        urgent: false,
+      })),
+    ].slice(0, 5);
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-blue-500" />
+            Dernières notifications DGFIP
+          </h3>
+          <button
+            onClick={() => navigate('/fiscal-calendar')}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+          >
+            Voir tout <ArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {items.map((item, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-3 p-3 rounded-xl border ${
+                item.urgent
+                  ? 'bg-red-50 border-red-100'
+                  : 'bg-blue-50/50 border-blue-100/60'
+              }`}
+            >
+              {item.icon}
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-medium truncate ${item.urgent ? 'text-red-800' : 'text-gray-800'}`}>
+                  {item.text}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">{item.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }, [fiscalTasks, navigate]);
 
   if (loading) {
     return (
@@ -668,6 +788,12 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
           </p>
         </button>
       </div>
+
+      {/* ── Santé Fiscale DGFIP ──────────────────────────────────────── */}
+      {fiscalHealthKpi}
+
+      {/* ── DGFIP Notifications ──────────────────────────────────────── */}
+      {dgfipNotifications}
 
       {/* ── Charts ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
