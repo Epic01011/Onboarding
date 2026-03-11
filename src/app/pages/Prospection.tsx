@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   Radar, Search, Mail, Filter, Bookmark, BookmarkCheck,
   Building2, User, Phone, Tag, Send, X, SlidersHorizontal,
@@ -245,8 +245,7 @@ function storeRowToLead(
 
 export function Prospection() {
   const navigate = useNavigate();
-
-  // ── Store (Supabase persistence) ──────────────────────────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     prospects: storeProspects,
     fetchProspects,
@@ -379,6 +378,23 @@ export function Prospection() {
       setLeadsInitialized(true);
     }
   }, [storeProspects, leadsInitialized]);
+
+  // ── Deep-link: open prospect sheet from URL ?prospectId=XYZ ───────────────
+  // Fires once when leads are first initialized. We intentionally omit
+  // `searchParams` and `leads` from deps: we only want this to run a single
+  // time after the initial load — stale-closure values are fine because both
+  // are read synchronously at the moment `leadsInitialized` flips to true.
+  useEffect(() => {
+    if (!leadsInitialized) return;
+    const prospectId = searchParams.get('prospectId');
+    if (!prospectId) return;
+    const match = leads.find(l => l.id === prospectId);
+    if (match) {
+      setSheetId(match.id);
+    }
+    // Clear the param to prevent re-opening on page refresh
+    setSearchParams({}, { replace: true });
+  }, [leadsInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Lead scoring context (Chantier Lead Scoring) ─────────────────────────
   const [specialty] = useState<CabinetSpecialty>(() => getCabinetSpecialty());
