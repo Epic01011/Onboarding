@@ -4,7 +4,7 @@ import {
   Mail, ArrowLeft, Search, Trash2, Download, Archive,
   CheckSquare, Square, Eye, X, Clock, Tag, MonitorSmartphone,
   RefreshCw, ChevronDown, ChevronUp, Inbox, ArchiveX,
-  Filter, MoreHorizontal,
+  Filter, MoreHorizontal, TrendingUp, BarChart3, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -22,6 +22,17 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   delegation:       { label: 'Délégation',     color: 'bg-orange-100 text-orange-700 border-orange-200' },
   campaign:         { label: 'Campagne',       color: 'bg-pink-100 text-pink-700 border-pink-200' },
   confraternelle:   { label: 'Confraternelle', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+};
+
+/** Maps emailType → human-readable source module name */
+const MODULE_SOURCE: Record<string, string> = {
+  proposal:         'Pricing Engine',
+  ldm:              'Lettre de Mission',
+  document_request: 'Onboarding',
+  welcome:          'Onboarding',
+  delegation:       'Gestion Dossier',
+  campaign:         'Prospection',
+  confraternelle:   'Relations Cabinet',
 };
 
 type Folder = 'inbox' | 'archived';
@@ -132,7 +143,33 @@ export function EmailEnginePage() {
     )
     .filter(e => typeFilter === 'all' || e.emailType === typeFilter);
 
-  // ── Select all indeterminate state ────────────────────────────────────────
+  // ── KPI stats ─────────────────────────────────────────────────────────────
+  const kpi = (() => {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    const sentThisMonth = emails.filter(e => {
+      const d = new Date(e.sentAt);
+      return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+    });
+    const realEmails = emails.filter(e => !e.demo);
+    const byType: Record<string, number> = {};
+    emails.forEach(e => {
+      const key = e.emailType ?? 'other';
+      byType[key] = (byType[key] ?? 0) + 1;
+    });
+    const topModule = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+    return {
+      total: emails.length,
+      sentThisMonth: sentThisMonth.length,
+      realEmails: realEmails.length,
+      topModule: topModule
+        ? { name: MODULE_SOURCE[topModule[0]] ?? topModule[0], count: topModule[1] }
+        : null,
+    };
+  })();
+
+
   const allSelected = visibleEmails.length > 0 && visibleEmails.every(e => selected.has(e.id));
   const someSelected = visibleEmails.some(e => selected.has(e.id)) && !allSelected;
 
@@ -276,6 +313,51 @@ export function EmailEnginePage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {/* ── KPI cards ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Send className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Emails ce mois</p>
+              <p className="text-xl font-bold text-gray-900 tabular-nums">{kpi.sentThisMonth}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Mail className="w-4 h-4 text-violet-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Total envoyés</p>
+              <p className="text-xl font-bold text-gray-900 tabular-nums">{kpi.total}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Emails réels</p>
+              <p className="text-xl font-bold text-gray-900 tabular-nums">{kpi.realEmails}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <BarChart3 className="w-4 h-4 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Module top</p>
+              <p className="text-sm font-bold text-gray-900 leading-tight truncate max-w-[100px]">
+                {kpi.topModule ? kpi.topModule.name : '—'}
+              </p>
+              {kpi.topModule && (
+                <p className="text-xs text-gray-400 tabular-nums">{kpi.topModule.count} envoi{kpi.topModule.count > 1 ? 's' : ''}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* ── Email engine card ── */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           {/* Card header — collapsible */}
@@ -498,9 +580,17 @@ export function EmailEnginePage() {
                                   )}
                                 </div>
                                 <p className="text-xs text-gray-600 truncate mt-0.5">{email.subject}</p>
-                                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5" />
-                                  {formatDate(email.sentAt)}
+                                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {formatDate(email.sentAt)}
+                                  </span>
+                                  {email.emailType && MODULE_SOURCE[email.emailType] && (
+                                    <span className="text-gray-300">·</span>
+                                  )}
+                                  {email.emailType && MODULE_SOURCE[email.emailType] && (
+                                    <span>{MODULE_SOURCE[email.emailType]}</span>
+                                  )}
                                 </p>
                               </div>
                               <Eye className={`w-4 h-4 flex-shrink-0 mt-1 transition-colors ${
