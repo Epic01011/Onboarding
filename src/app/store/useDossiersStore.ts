@@ -117,7 +117,11 @@ export const useDossiersStore = create<DossiersStore>((set, get) => ({
 
   saveDossier: async (dossier) => {
     const { _accessToken, _userId } = get();
-    const updated = { ...dossier, updatedAt: new Date().toISOString() };
+    const updated = {
+      ...dossier,
+      missionType: dossier.missionType || dossier.clientData.missionType || undefined,
+      updatedAt: new Date().toISOString(),
+    };
 
     // Optimistic local update
     saveLocalDossier(updated);
