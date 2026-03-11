@@ -83,6 +83,9 @@ type LeadEntry  = Prospect & {
   openCount: number;
   clicked: boolean;
   emailSentAt?: string;
+  /** Real open/click timestamps (Chantier 7) */
+  openedAt?: string;
+  clickedAt?: string;
   /** AI icebreaker (Chantier 8) */
   icebreakerIa?: string;
   icebreakerLoading?: boolean;
@@ -98,6 +101,8 @@ type LeadEntry  = Prospect & {
   /** Event RSVP status (Événements Locaux) */
   eventStatus?: RsvpStatus;
   eventId?: string;
+  /** Direct LinkedIn profile URL (when known) */
+  linkedinUrl?: string;
   /** Valeur financière estimée du contrat (€) */
   estimatedValue?: number | null;
   /** Date de la prochaine action commerciale */
@@ -230,12 +235,16 @@ function storeRowToLead(
     openCount:           p.open_count ?? 0,
     clicked:             p.clicked ?? false,
     emailSentAt:         p.email_sent_at ?? undefined,
+    openedAt:            p.opened_at ?? undefined,
+    clickedAt:           p.clicked_at ?? undefined,
     icebreakerIa:        p.icebreaker_ia ?? undefined,
     kanbanColumn:        (p.kanban_column ?? 'a-contacter') as KanbanColumn,
     sequenceStep:        p.sequence_step ?? 0,
     nextFollowUpDate:    p.next_follow_up_date ?? undefined,
     callLogs:            p.call_logs ?? [],
     leadScore:           computeLeadScore(prospect, p.open_count ?? 0, ctx).total,
+    eventStatus:         (p.event_status as RsvpStatus | undefined) ?? undefined,
+    linkedinUrl:         p.linkedin_url ?? undefined,
     estimatedValue:      p.estimated_value ?? null,
     nextActionDate:      p.next_action_date ?? null,
   };
@@ -252,6 +261,7 @@ export function Prospection() {
     fetchProspects,
     updateProspectStatus,
     updateProspectFields,
+    updateEventStatus,
     deleteProspect,
     selectedSecteur: storeSecteur,
     setSelectedSecteur: setStoreSecteur,
@@ -332,6 +342,10 @@ export function Prospection() {
   const [noteSaved, setNoteSaved]           = useState(false);
   const noteSavedTimerRef                   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // LinkedIn URL editing state
+  const [editingLinkedinUrl, setEditingLinkedinUrl] = useState(false);
+  const [linkedinUrlDraft, setLinkedinUrlDraft]     = useState('');
+
   // Active lead derived from sheetId
   const activeLead = sheetId
     ? leads.find(l => l.id === sheetId) ?? null
@@ -348,6 +362,9 @@ export function Prospection() {
     // Reset edit mode and tab whenever we switch prospects
     setIsEditingSheet(false);
     setSheetTab('details');
+    // Reset LinkedIn editing state
+    setEditingLinkedinUrl(false);
+    setLinkedinUrlDraft('');
   }, [sheetId, leads, notesMap]);
 
   // ── Load DB prospects on mount ────────────────────────────────────────────
@@ -573,12 +590,16 @@ export function Prospection() {
             openCount: saved?.open_count ?? 0,
             clicked: saved?.clicked ?? false,
             emailSentAt: saved?.email_sent_at ?? undefined,
+            openedAt: saved?.opened_at ?? undefined,
+            clickedAt: saved?.clicked_at ?? undefined,
             icebreakerIa: saved?.icebreaker_ia ?? undefined,
             kanbanColumn: ((saved?.kanban_column ?? statusToKanban(statusMapRef.current[leadId] ?? 'nouveau'))) as KanbanColumn,
             sequenceStep: saved?.sequence_step ?? 0,
             nextFollowUpDate: saved?.next_follow_up_date ?? undefined,
             callLogs: saved?.call_logs ?? [],
             leadScore: computeLeadScore(p, saved?.open_count ?? 0, scoringCtx).total,
+            eventStatus: (saved?.event_status as RsvpStatus | undefined) ?? undefined,
+            linkedinUrl: saved?.linkedin_url ?? undefined,
           };
         });
         setLeads(newLeads);
@@ -641,12 +662,16 @@ export function Prospection() {
             openCount: saved?.open_count ?? 0,
             clicked: saved?.clicked ?? false,
             emailSentAt: saved?.email_sent_at ?? undefined,
+            openedAt: saved?.opened_at ?? undefined,
+            clickedAt: saved?.clicked_at ?? undefined,
             icebreakerIa: saved?.icebreaker_ia ?? undefined,
             kanbanColumn: ((saved?.kanban_column ?? statusToKanban(statusMapRef.current[leadId] ?? 'nouveau'))) as KanbanColumn,
             sequenceStep: saved?.sequence_step ?? 0,
             nextFollowUpDate: saved?.next_follow_up_date ?? undefined,
             callLogs: saved?.call_logs ?? [],
             leadScore: computeLeadScore(p, saved?.open_count ?? 0, scoringCtx).total,
+            eventStatus: (saved?.event_status as RsvpStatus | undefined) ?? undefined,
+            linkedinUrl: saved?.linkedin_url ?? undefined,
           };
         });
 
@@ -2017,20 +2042,90 @@ export function Prospection() {
                         : <span className="text-xs text-gray-300 italic">Non disponible — enrichissement requis</span>
                       }
                     </div>
-                    {/* LinkedIn search link (Chantier 10) */}
-                    {activeLead.dirigeantPrincipal && (
-                      <div className="flex items-center gap-2">
-                        <Linkedin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                        <a
-                          href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
-                            [activeLead.dirigeantPrincipal?.prenom ?? '', activeLead.dirigeantPrincipal?.nom ?? '', activeLead.nomSociete ?? ''].filter(Boolean).join(' ')
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          Rechercher sur LinkedIn <ExternalLink className="w-3 h-3 inline" />
-                        </a>
+                    {/* LinkedIn — direct URL or search + add button (Chantier 10) */}
+                    {(activeLead.dirigeantPrincipal || activeLead.linkedinUrl) && (
+                      <div className="flex items-start gap-2">
+                        <Linkedin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                          {activeLead.linkedinUrl ? (
+                            <a
+                              href={activeLead.linkedinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline flex items-center gap-1 truncate"
+                            >
+                              Profil LinkedIn <ExternalLink className="w-3 h-3 flex-shrink-0 inline" />
+                            </a>
+                          ) : (
+                            <a
+                              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
+                                [activeLead.dirigeantPrincipal?.prenom ?? '', activeLead.dirigeantPrincipal?.nom ?? '', activeLead.nomSociete ?? ''].filter(Boolean).join(' ')
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              Rechercher sur LinkedIn <ExternalLink className="w-3 h-3 inline" />
+                            </a>
+                          )}
+                          {!editingLinkedinUrl && (
+                            <button
+                              onClick={() => {
+                                setLinkedinUrlDraft(activeLead.linkedinUrl ?? '');
+                                setEditingLinkedinUrl(true);
+                              }}
+                              className="text-[11px] text-gray-400 hover:text-blue-600 flex items-center gap-0.5 w-fit"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                              {activeLead.linkedinUrl ? 'Modifier le profil' : 'Ajouter le profil'}
+                            </button>
+                          )}
+                          {editingLinkedinUrl && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Input
+                                placeholder="https://www.linkedin.com/in/..."
+                                value={linkedinUrlDraft}
+                                onChange={e => setLinkedinUrlDraft(e.target.value)}
+                                className="h-7 text-xs flex-1"
+                                onKeyDown={async e => {
+                                  if (e.key === 'Enter') {
+                                    const url = linkedinUrlDraft.trim();
+                                    const id = activeLead.id;
+                                    setEditingLinkedinUrl(false);
+                                    setLeads(prev => prev.map(l =>
+                                      l.id === id ? { ...l, linkedinUrl: url || undefined } : l
+                                    ));
+                                    await updateProspectFields(id, { linkedin_url: url || null });
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingLinkedinUrl(false);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={async () => {
+                                  const url = linkedinUrlDraft.trim();
+                                  const id = activeLead.id;
+                                  setEditingLinkedinUrl(false);
+                                  setLeads(prev => prev.map(l =>
+                                    l.id === id ? { ...l, linkedinUrl: url || undefined } : l
+                                  ));
+                                  await updateProspectFields(id, { linkedin_url: url || null });
+                                }}
+                                className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => setEditingLinkedinUrl(false)}
+                                className="px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs hover:bg-gray-200"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </dl>
@@ -2061,9 +2156,23 @@ export function Prospection() {
                         Email initial envoyé {new Date(activeLead.emailSentAt).toLocaleDateString('fr-FR')}
                       </div>
                       {activeLead.sequenceStep > 0 && activeLead.nextFollowUpDate && (
-                        <div className="flex items-center gap-2 text-xs text-amber-600">
-                          <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Relance {activeLead.sequenceStep}</span>
-                          Planifiée le {new Date(activeLead.nextFollowUpDate).toLocaleDateString('fr-FR')}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-xs text-amber-600">
+                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Relance {activeLead.sequenceStep}</span>
+                            Planifiée le {new Date(activeLead.nextFollowUpDate).toLocaleDateString('fr-FR')}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelected(new Set([activeLead.siren]));
+                              setSheetId(null);
+                              setShowCampaignModal(true);
+                            }}
+                            aria-label="Envoyer la relance maintenant"
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors flex-shrink-0"
+                            title="Envoyer la relance maintenant"
+                          >
+                            <Send className="w-2.5 h-2.5" /> Envoyer maintenant
+                          </button>
                         </div>
                       )}
                       {activeLead.openCount > 0 && (
@@ -2169,7 +2278,35 @@ export function Prospection() {
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                       <CalendarCheck className="w-3.5 h-3.5" /> Statut événement
                     </h3>
-                    <EventStatusBadge status={activeLead.eventStatus} />
+                    <Select
+                      value={activeLead.eventStatus}
+                      onValueChange={async (value) => {
+                        const id = activeLead.id;
+                        setLeads(prev => prev.map(l =>
+                          l.id === id ? { ...l, eventStatus: value as RsvpStatus } : l
+                        ));
+                        const result = await updateEventStatus(id, value);
+                        if (!result.success) {
+                          setLeads(prev => prev.map(l =>
+                            l.id === id ? { ...l, eventStatus: activeLead.eventStatus } : l
+                          ));
+                          toast.error('Impossible de mettre à jour le statut événement.');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs w-auto min-w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.entries(EVENT_STATUS_CONFIG) as [RsvpStatus, typeof EVENT_STATUS_CONFIG[RsvpStatus]][]).map(([key, cfg]) => (
+                          <SelectItem key={key} value={key} className="text-xs">
+                            <span className="flex items-center gap-1.5">
+                              {cfg.icon} {cfg.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </section>
                 )}
 
@@ -2645,16 +2782,6 @@ const EVENT_STATUS_CONFIG: Record<RsvpStatus, { label: string; pill: string; ico
   absent:          { label: 'Absent',       pill: 'bg-red-100 text-red-600',         icon: <XCircle className="w-3.5 h-3.5" /> },
 };
 
-function EventStatusBadge({ status }: { status: RsvpStatus }) {
-  const cfg = EVENT_STATUS_CONFIG[status];
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${cfg.pill}`}>
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-}
-
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
 interface TimelineEvent {
@@ -2699,26 +2826,36 @@ function ProspectTimeline({
       });
     }
 
-    // 3. Email ouvert (exact open timestamp not stored; approximate with sent date)
-    if (lead.openCount > 0 && lead.emailSentAt) {
-      raw.push({
-        date: new Date(lead.emailSentAt),
-        icon: '👁️',
-        label: `Email ouvert ${lead.openCount} fois`,
-        detail: 'Horodatage exact non disponible — daté à l\'envoi',
-        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      });
+    // 3. Email ouvert — use real openedAt timestamp when available
+    if (lead.openCount > 0) {
+      const openDate = lead.openedAt
+        ? new Date(lead.openedAt)
+        : lead.emailSentAt ? new Date(lead.emailSentAt) : null;
+      if (openDate) {
+        raw.push({
+          date: openDate,
+          icon: '👁️',
+          label: `Email ouvert ${lead.openCount} fois`,
+          detail: lead.openedAt ? undefined : 'Horodatage exact non disponible — daté à l\'envoi',
+          color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        });
+      }
     }
 
-    // 4. Lien cliqué (exact click timestamp not stored; approximate with sent date)
-    if (lead.clicked && lead.emailSentAt) {
-      raw.push({
-        date: new Date(lead.emailSentAt),
-        icon: '🖱️',
-        label: 'Lien / devis cliqué',
-        detail: 'Horodatage exact non disponible — daté à l\'envoi',
-        color: 'bg-violet-50 text-violet-700 border-violet-200',
-      });
+    // 4. Lien cliqué — use real clickedAt timestamp when available
+    if (lead.clicked) {
+      const clickDate = lead.clickedAt
+        ? new Date(lead.clickedAt)
+        : lead.emailSentAt ? new Date(lead.emailSentAt) : null;
+      if (clickDate) {
+        raw.push({
+          date: clickDate,
+          icon: '🖱️',
+          label: 'Lien / devis cliqué',
+          detail: lead.clickedAt ? undefined : 'Horodatage exact non disponible — daté à l\'envoi',
+          color: 'bg-violet-50 text-violet-700 border-violet-200',
+        });
+      }
     }
 
     // 5. Relances planifiées
