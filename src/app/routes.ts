@@ -117,24 +117,10 @@ export const router = createBrowserRouter([
         },
       },
       {
-        path: "taches-overdue",
-        lazy: async () => {
-          const { TachesOverdue } = await import('./pages/TachesOverdue');
-          return { Component: TachesOverdue };
-        },
-      },
-      {
         path: "lettre-reprise",
         lazy: async () => {
           const { LettreReprise } = await import('./pages/LettreReprise');
           return { Component: LettreReprise };
-        },
-      },
-      {
-        path: "relances-critiques",
-        lazy: async () => {
-          const { RelancesCritiques } = await import('./pages/RelancesCritiques');
-          return { Component: RelancesCritiques };
         },
       },
       {
