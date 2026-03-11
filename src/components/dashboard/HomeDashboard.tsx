@@ -37,6 +37,13 @@ type Blocker = {
   clientNom: string;
 };
 
+interface DgfipNotificationItem {
+  icon: React.ReactNode;
+  text: string;
+  sub: string;
+  urgent: boolean;
+}
+
 interface HomeDashboardProps {
   /** Pre-loaded signed clients passed from parent to avoid duplicate API calls. */
   signedClients?: SignedClient[];
@@ -207,7 +214,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             Santé Fiscale DGFIP
           </p>
           <p className={`text-2xl font-bold ${isHealthy ? 'text-emerald-900' : 'text-amber-900'}`}>
-            {pct} % <span className="text-sm font-normal">dossiers à jour</span>
+            {pct} % <span className="text-sm font-normal">tâches à jour</span>
           </p>
           <p className={`text-xs mt-0.5 ${isHealthy ? 'text-emerald-600' : 'text-amber-700'}`}>
             {certified} / {allTasks.length} tâches certifiées DGFIP
@@ -235,7 +242,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
     const certTasks = fiscalTasks.filter(t => t.is_dgfip_certified && t.status !== 'declared');
     if (mismatchTasks.length === 0 && certTasks.length === 0) return null;
 
-    const items: Array<{ icon: React.ReactNode; text: string; sub: string; urgent: boolean }> = [
+    const items: DgfipNotificationItem[] = [
       ...mismatchTasks.slice(0, 3).map(t => ({
         icon: <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0" />,
         text: `Discordance DGFIP — ${t.client_name}`,

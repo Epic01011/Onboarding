@@ -16,7 +16,7 @@
 import { useMemo } from 'react';
 import { FiscalTask } from '../types/dashboard';
 
-/** Priority level of the alert. "high" is assigned when DGFIP detects a payment delay. */
+/** Priority level of the alert. "high" is assigned for overdue DGFIP-certified tasks or tasks with a mismatch alert. */
 export type FiscalAlertPriority = 'high' | 'normal';
 
 export interface FiscalAlert {

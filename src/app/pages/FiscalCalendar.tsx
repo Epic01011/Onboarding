@@ -252,9 +252,10 @@ function MatrixCell({
   const next = STATUS_NEXT[task.status];
 
   // Mismatch alert: pulsing red border overrides normal background
+  const baseCellClass = 'text-center p-1.5';
   const cellClass = task.mismatch_alert
-    ? `text-center p-1.5 border-2 border-red-500 animate-pulse ${cellBg(task)}`
-    : `text-center p-1.5 border border-gray-100 ${cellBg(task)}`;
+    ? `${baseCellClass} border-2 border-red-500 animate-pulse ${cellBg(task)}`
+    : `${baseCellClass} border border-gray-100 ${cellBg(task)}`;
 
   return (
     <TableCell className={cellClass}>
@@ -317,17 +318,18 @@ function MatrixCell({
 
 /** Simple CSV/Excel export — downloads tasks as a .csv file */
 function exportToExcel(tasks: FiscalTask[]): void {
+  const escCsv = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const header = ['Client', 'Type', 'Échéance', 'Statut', 'Urgence', 'DGFIP certifié', 'Discordance'];
   const rows = tasks.map(t => [
-    t.client_name,
-    t.task_type,
-    t.due_date.slice(0, 10),
-    t.status,
-    t.urgency_semantic,
+    escCsv(t.client_name),
+    escCsv(t.task_type),
+    escCsv(t.due_date.slice(0, 10)),
+    escCsv(t.status),
+    escCsv(t.urgency_semantic),
     t.is_dgfip_certified ? 'Oui' : 'Non',
     t.mismatch_alert ? 'Oui' : 'Non',
   ]);
-  const csv = [header, ...rows].map(r => r.join(';')).join('\n');
+  const csv = [header.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -337,12 +339,12 @@ function exportToExcel(tasks: FiscalTask[]): void {
   URL.revokeObjectURL(url);
 }
 
-/** Simple PDF export — opens a print-ready page with the fiscal schedule */
-function exportToPdf(tasks: FiscalTask[]): void {
+/** Opens a print-ready window with the full fiscal schedule for PDF saving */
+function openPrintPreview(tasks: FiscalTask[]): void {
   const rows = tasks
     .map(t =>
       `<tr>
-        <td>${t.client_name}</td>
+        <td>${t.client_name.replace(/</g, '&lt;')}</td>
         <td>${t.task_type}</td>
         <td>${t.due_date.slice(0, 10)}</td>
         <td>${t.status}</td>
@@ -511,9 +513,9 @@ export function FiscalCalendar() {
           </button>
 
           <button
-            onClick={() => exportToPdf(displayTasks)}
+            onClick={() => openPrintPreview(displayTasks)}
             className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
-            title="Exporter l'échéancier en PDF"
+            title="Ouvrir l'aperçu d'impression pour l'échéancier"
           >
             <FileText className="w-4 h-4" />
             Export PDF
