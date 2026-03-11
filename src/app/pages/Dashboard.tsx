@@ -6,7 +6,7 @@ import {
   FolderOpen, Clock, CheckCircle2, Building2,
   Trash2, ArrowRight, Zap, AlertCircle,
   Settings, LogOut,
-  UserPlus,
+  UserPlus, TrendingUp,
 } from 'lucide-react';
 import { createDemoDossiers } from '../utils/demoData';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ import {
   type SignedClient, type SentEmailRecord,
 } from '../utils/supabaseSync';
 import { getDossierStatus } from '../utils/dossierUtils';
+import { useDashboardStore } from '../store/useDashboardStore';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export function Dashboard() {
   const { connections } = useServices();
   const [activeFilter, setActiveFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
   const [, setCreatingDossier] = useState(false);
+  const { balanceSheets, loadBalanceSheetsFromSupabase } = useDashboardStore();
 
   // ── Signed clients (propositions SIGNED) ────────────────────────────────
   const [signedClients, setSignedClients] = useState<SignedClient[]>([]);
@@ -129,7 +131,8 @@ export function Dashboard() {
   useEffect(() => {
     loadDashboardData();
     loadSentEmails();
-  }, [loadDashboardData, loadSentEmails]);
+    loadBalanceSheetsFromSupabase();
+  }, [loadDashboardData, loadSentEmails, loadBalanceSheetsFromSupabase]);
 
   const filteredDossiers = useMemo(() => dossiers.filter(d => {
     if (activeFilter === 'all') return true;
@@ -139,11 +142,24 @@ export function Dashboard() {
     return true;
   }), [dossiers, activeFilter]);
 
+  const fiscalPeriodValue = useMemo(() => {
+    if (balanceSheets.length === 0) return '—';
+    const certified = balanceSheets.filter(s => s.productionStep === 'certified').length;
+    return `${certified}/${balanceSheets.length}`;
+  }, [balanceSheets]);
+
   const statCards = useMemo(() => [
     { label: 'Total Dossiers', value: dossiers.length, icon: FolderOpen, color: 'blue' },
     { label: 'En cours', value: dossiers.filter(d => getDossierStatus(d) === 'in_progress').length, icon: Clock, color: 'amber' },
     { label: 'Terminés', value: dossiers.filter(d => getDossierStatus(d) === 'completed').length, icon: CheckCircle2, color: 'emerald' },
-  ], [dossiers]);
+    {
+      label: 'Avancement Période Fiscale',
+      value: fiscalPeriodValue,
+      icon: TrendingUp,
+      color: 'indigo',
+      onClick: () => navigate('/balance-sheet'),
+    },
+  ], [dossiers, fiscalPeriodValue, navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -218,9 +234,13 @@ export function Dashboard() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8 mb-8">
           {statCards.map((card) => (
-            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-6">
+            <div
+              key={card.label}
+              className={`bg-white rounded-xl border border-gray-200 p-6 ${'onClick' in card ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all' : ''}`}
+              onClick={'onClick' in card ? card.onClick : undefined}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">{card.label}</p>

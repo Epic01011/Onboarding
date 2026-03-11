@@ -3,7 +3,7 @@ import {
   Upload, Cpu, Lock, Database, Trophy,
   CheckCircle2, Circle, MinusCircle, Zap, ChevronRight, RotateCcw,
   Settings, FileText, Home, Calendar, Calculator, Radar, CalendarCheck,
-  CreditCard, Landmark, FileSpreadsheet, type LucideIcon,
+  CreditCard, Landmark, FileSpreadsheet, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 import { useOnboarding, StepStatus } from '../context/OnboardingContext';
 import { useServices } from '../context/ServicesContext';
@@ -121,6 +121,13 @@ export function Sidebar() {
             style={{ fontSize: '10px' }}
           >
             <CalendarCheck className="w-3 h-3" /> Événements Locaux
+          </button>
+          <button
+            onClick={() => navigate('/balance-sheet')}
+            className="flex items-center justify-center gap-1 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-all col-span-3"
+            style={{ fontSize: '10px' }}
+          >
+            <TrendingUp className="w-3 h-3" /> Suivi des Bilans
           </button>
         </div>
 

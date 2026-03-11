@@ -35,6 +35,7 @@
 
 import { supabase } from './supabaseClient';
 import type { QuoteStatus } from '../store/usePricingStore';
+import type { ProductionStep, UrgencySemantic } from '../types/dashboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1436,6 +1437,160 @@ export async function generateQuoteAcceptToken(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erreur inconnue';
     console.warn('[supabaseSync] generateQuoteAcceptToken exception:', message);
+    return { success: false, error: message };
+  }
+}
+
+// ─── balance_sheets (Suivi des Bilans — Pennylane) ───────────────────────────
+
+/**
+ * Enregistrement d'un exercice comptable tel que stocké dans `balance_sheets`.
+ * Correspond au mapping complet entre Pennylane et la base locale.
+ */
+export interface BalanceSheetRecord {
+  id?: string;
+  userId: string;
+  pennylaneId: string;
+  customerId: string;
+  customerName: string;
+  startDate: string;           // ISO date
+  closingDate: string;         // ISO date — clôture Pennylane
+  pennylaneStatus: 'open' | 'closed' | 'closing_in_progress';
+  productionStep: ProductionStep;
+  assignedManager?: string;
+  dueDate: string;             // ISO date — clôture + 4 mois (échéance légale)
+  urgencySemantic: UrgencySemantic;
+  notes?: string;
+  syncedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Insère ou met à jour un exercice comptable dans `balance_sheets`.
+ * La clé de déduplication est (user_id, pennylane_id).
+ */
+export async function upsertBalanceSheet(
+  record: BalanceSheetRecord
+): Promise<SyncResult> {
+  try {
+    const { error } = await supabase
+      .from('balance_sheets')
+      .upsert(
+        {
+          user_id: record.userId,
+          pennylane_id: record.pennylaneId,
+          customer_id: record.customerId,
+          customer_name: record.customerName,
+          start_date: record.startDate,
+          closing_date: record.closingDate,
+          pennylane_status: record.pennylaneStatus,
+          production_step: record.productionStep,
+          assigned_manager: record.assignedManager ?? null,
+          due_date: record.dueDate,
+          urgency_semantic: record.urgencySemantic,
+          notes: record.notes ?? null,
+          synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,pennylane_id' }
+      );
+
+    if (error) {
+      console.warn('[supabaseSync] upsertBalanceSheet error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.warn('[supabaseSync] upsertBalanceSheet exception:', message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Récupère tous les exercices comptables d'un utilisateur depuis `balance_sheets`,
+ * triés par date de clôture croissante (les plus proches en premier).
+ */
+export async function getBalanceSheets(
+  userId: string
+): Promise<{ success: true; data: BalanceSheetRecord[] } | { success: false; error: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('balance_sheets')
+      .select('*')
+      .eq('user_id', userId)
+      .order('closing_date', { ascending: true });
+
+    if (error) {
+      console.warn('[supabaseSync] getBalanceSheets error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    const records: BalanceSheetRecord[] = (data ?? []).map(row => ({
+      id: row.id as string,
+      userId: row.user_id as string,
+      pennylaneId: row.pennylane_id as string,
+      customerId: row.customer_id as string,
+      customerName: row.customer_name as string,
+      startDate: row.start_date as string,
+      closingDate: row.closing_date as string,
+      pennylaneStatus: row.pennylane_status as BalanceSheetRecord['pennylaneStatus'],
+      productionStep: (row.production_step as ProductionStep) ?? 'not_started',
+      assignedManager: (row.assigned_manager as string | null) ?? undefined,
+      dueDate: row.due_date as string,
+      urgencySemantic: (row.urgency_semantic as UrgencySemantic) ?? 'green',
+      notes: (row.notes as string | null) ?? undefined,
+      syncedAt: row.synced_at as string,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    }));
+
+    return { success: true, data: records };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.warn('[supabaseSync] getBalanceSheets exception:', message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Met à jour l'étape de production et le collaborateur d'un bilan.
+ * Utilisé depuis le tableau de bord BalanceSheetTracker.
+ */
+export async function updateBalanceSheetProduction(
+  userId: string,
+  pennylaneId: string,
+  updates: {
+    productionStep?: ProductionStep;
+    assignedManager?: string;
+    urgencySemantic?: UrgencySemantic;
+    notes?: string;
+  }
+): Promise<SyncResult> {
+  try {
+    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (updates.productionStep !== undefined) payload.production_step = updates.productionStep;
+    if (updates.assignedManager !== undefined) payload.assigned_manager = updates.assignedManager;
+    if (updates.urgencySemantic !== undefined) payload.urgency_semantic = updates.urgencySemantic;
+    if (updates.notes !== undefined) payload.notes = updates.notes;
+
+    const { error } = await supabase
+      .from('balance_sheets')
+      .update(payload)
+      .eq('user_id', userId)
+      .eq('pennylane_id', pennylaneId);
+
+    if (error) {
+      console.warn('[supabaseSync] updateBalanceSheetProduction error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.warn('[supabaseSync] updateBalanceSheetProduction exception:', message);
     return { success: false, error: message };
   }
 }
