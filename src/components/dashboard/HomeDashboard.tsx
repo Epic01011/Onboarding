@@ -274,7 +274,46 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
           </div>
 
-          {/* Step 3 — LDM */}
+          {/* Step 3 — Conversion / Centre d'actions */}
+          <button
+            onClick={() => navigate('/action-center')}
+            className={`w-full flex flex-col gap-3 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border ${
+              kpis.overdues > 0
+                ? 'bg-rose-50 border-rose-200 hover:border-rose-400'
+                : 'bg-white border-slate-200 hover:border-rose-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                kpis.overdues > 0 ? 'bg-rose-100' : 'bg-rose-50'
+              }`}>
+                <Zap className={`w-7 h-7 ${kpis.overdues > 0 ? 'text-rose-600' : 'text-rose-400'}`} />
+              </div>
+              {kpis.overdues > 0 && (
+                <span className="bg-rose-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                  {kpis.overdues}
+                </span>
+              )}
+            </div>
+            <div>
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                kpis.overdues > 0 ? 'text-rose-500' : 'text-rose-400'
+              }`}>Étape 3</span>
+              <p className={`font-bold mt-0.5 leading-tight ${kpis.overdues > 0 ? 'text-rose-900' : 'text-gray-900'}`}>
+                Conversion
+              </p>
+              <p className="text-xs font-semibold text-slate-500 mt-0.5">Centre d'actions</p>
+              <p className={`text-xs mt-0.5 ${kpis.overdues > 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                Relances & tâches unifiées
+              </p>
+            </div>
+          </button>
+
+          <div className="flex justify-center py-1.5" aria-hidden="true">
+            <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
+          </div>
+
+          {/* Step 4 — LDM */}
           <button
             onClick={() => navigate('/lettre-mission')}
             className={`w-full flex flex-col gap-3 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border ${
@@ -298,7 +337,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             <div>
               <span className={`text-[10px] font-bold uppercase tracking-widest ${
                 validatedQuotesCount > 0 ? 'text-emerald-500' : 'text-emerald-400'
-              }`}>Étape 3</span>
+              }`}>Étape 4</span>
               <p className={`font-bold mt-0.5 ${validatedQuotesCount > 0 ? 'text-emerald-900' : 'text-gray-900'}`}>
                 LDM
               </p>
@@ -314,7 +353,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             <ChevronRight className="w-4 h-4 text-slate-300 rotate-90" />
           </div>
 
-          {/* Step 4 — Onboarding */}
+          {/* Step 5 — Onboarding */}
           <button
             onClick={() => setShowNewDossierModal(true)}
             disabled={creatingDossier}
@@ -331,7 +370,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               )}
             </div>
             <div>
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Étape 4</span>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Étape 5</span>
               <p className="font-bold text-gray-900 mt-0.5">Onboarding</p>
               <p className="text-xs text-slate-400 mt-0.5">Créer un dossier</p>
             </div>
@@ -488,37 +527,6 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                 )}
               </button>
 
-              {/* Relances Critiques — col-span-2, wider (action rapide) */}
-              <button
-                onClick={() => navigate('/relances-critiques')}
-                className={`col-span-2 flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border relative ${
-                  kpis.overdues > 0
-                    ? 'bg-orange-50 border-orange-200 hover:border-orange-300'
-                    : 'bg-white border-slate-200/60 hover:border-orange-200'
-                }`}
-              >
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                  kpis.overdues > 0 ? 'bg-orange-100' : 'bg-orange-50'
-                }`}>
-                  <Bell className={`w-8 h-8 ${kpis.overdues > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-base ${kpis.overdues > 0 ? 'text-orange-900' : 'text-gray-900'}`}>
-                    Relances Critiques
-                  </p>
-                  <p className={`text-sm mt-0.5 ${kpis.overdues > 0 ? 'text-orange-600' : 'text-slate-500'}`}>
-                    {kpis.overdues > 0
-                      ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} en retard`
-                      : 'Suivi des urgences'}
-                  </p>
-                </div>
-                {kpis.overdues > 0 && (
-                  <span className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
-                    {kpis.overdues}
-                  </span>
-                )}
-              </button>
-
               {/* Calendrier Fiscal */}
               <button
                 onClick={() => navigate('/fiscal-calendar')}
@@ -561,72 +569,21 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
                 </div>
               </button>
 
-              {/* Tâches */}
-              <button
-                onClick={() => navigate('/taches-overdue')}
-                className={`col-span-1 flex flex-col gap-3 rounded-2xl p-5 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border relative ${
-                  kpis.blockers.length > 0
-                    ? 'bg-red-50/60 border-red-200/60 hover:border-red-300'
-                    : 'bg-white border-slate-200/60 hover:border-red-200'
-                }`}
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  kpis.blockers.length > 0 ? 'bg-red-100' : 'bg-red-50'
-                }`}>
-                  <AlertTriangle className={`w-7 h-7 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-red-400'}`} />
-                </div>
-                <div>
-                  <p className={`font-bold text-sm ${kpis.blockers.length > 0 ? 'text-red-800' : 'text-gray-900'}`}>
-                    Tâches
-                  </p>
-                  <p className={`text-xs mt-0.5 ${kpis.blockers.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                    {kpis.blockers.length > 0 ? `${kpis.blockers.length} blocage${kpis.blockers.length > 1 ? 's' : ''}` : 'Overdue'}
-                  </p>
-                </div>
-                {kpis.blockers.length > 0 && (
-                  <span className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
-                    {kpis.blockers.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Centre d'action — col-span-2 */}
-              <button
-                onClick={() => navigate('/action-center')}
-                className={`col-span-2 flex items-center gap-4 rounded-2xl p-5 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border ${
-                  kpis.overdues > 0
-                    ? 'bg-violet-50 border-violet-200 hover:border-violet-300'
-                    : 'bg-white border-slate-200/60 hover:border-violet-200'
-                }`}
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
-                }`}>
-                  <Zap className={`w-7 h-7 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-400'}`} />
-                </div>
-                <div>
-                  <p className={`font-bold text-sm ${kpis.overdues > 0 ? 'text-violet-900' : 'text-gray-900'}`}>
-                    Centre d'action
-                  </p>
-                  <p className={`text-sm mt-0.5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-slate-500'}`}>
-                    {kpis.overdues > 0
-                      ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} à traiter`
-                      : 'Relances & tâches unifiées'}
-                  </p>
-                </div>
-              </button>
-
-              {/* Email Engine — col-span-2 */}
+              {/* Email Engine — col-span-4, full-width prominent card */}
               <button
                 onClick={() => navigate('/email-engine')}
-                className="col-span-2 flex items-center gap-4 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-lg hover:-translate-y-0.5 hover:border-slate-300 transition-all duration-200"
+                className="col-span-4 flex items-center gap-5 bg-white border border-slate-200/60 rounded-2xl p-5 text-left hover:shadow-lg hover:-translate-y-0.5 hover:border-blue-200 transition-all duration-200"
               >
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Send className="w-7 h-7 text-slate-600" />
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Send className="w-8 h-8 text-blue-500" />
                 </div>
-                <div>
-                  <p className="font-bold text-sm text-gray-900">Email Engine</p>
-                  <p className="text-sm text-slate-500 mt-0.5">Historique des envois</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-base text-gray-900">Email Engine</p>
+                  <p className="text-sm text-slate-500 mt-0.5">Moteur des emails envoyés — historique complet des envois clients</p>
+                </div>
+                <div className="flex-shrink-0 flex items-center gap-2 text-xs text-slate-400">
+                  <span>Voir les envois</span>
+                  <ChevronRight className="w-4 h-4" />
                 </div>
               </button>
 
