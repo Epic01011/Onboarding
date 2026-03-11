@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, X, BookOpen, Handshake, FolderKanban,
-  HardDrive, Send, Zap, ChevronDown,
+  HardDrive, Send, Zap, ChevronDown, AtSign,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -227,7 +227,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             Conversion — Proposition commerciale
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Prospection */}
           <div className="flex items-center gap-3 bg-white border border-blue-100 rounded-xl p-3 hover:shadow-md transition-all group">
             <button
@@ -308,6 +308,39 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               <Plus className="w-4 h-4 text-emerald-600" />
             </button>
           </div>
+
+          {/* Centre d'actions */}
+          <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
+            kpis.overdues > 0
+              ? 'bg-violet-50 border-violet-200'
+              : 'bg-white border-blue-100'
+          }`}>
+            <button
+              onClick={() => navigate('/action-center')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
+              }`}>
+                <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
+                  Centre d'actions
+                </p>
+                <p className={`text-xs truncate ${kpis.overdues > 0 ? 'text-violet-600' : 'text-slate-400'}`}>
+                  Relances et tâches unifiées
+                </p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/action-center')}
+              title="Voir le centre d'actions"
+              className="w-7 h-7 bg-violet-50 hover:bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-violet-600" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -380,16 +413,16 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
       </div>
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* BLOC 3 — PRODUCTION (fond gris/blanc)                         */}
+      {/* BLOC 3 — HUB OPÉRATIONNEL (fond gris/blanc)                   */}
       {/* ══════════════════════════════════════════════════════════════ */}
       <div className="bg-slate-50/80 border border-slate-200/60 rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-            Production — Gestion quotidienne
+            Hub Opérationnel — Outils & Documents
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Inbox IA */}
           <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
             kpis.aiPending > 0
@@ -471,61 +504,26 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             </button>
           </div>
 
-          {/* Tâches */}
-          <div className={`flex items-center gap-3 rounded-xl p-3 border hover:shadow-md transition-all group ${
-            kpis.overdues > 0
-              ? 'bg-violet-50 border-violet-200'
-              : 'bg-white border-slate-200/60'
-          }`}>
-            <button
-              onClick={() => navigate('/action-center')}
-              className="flex items-center gap-3 flex-1 min-w-0 text-left"
-            >
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                kpis.overdues > 0 ? 'bg-violet-100' : 'bg-violet-50'
-              }`}>
-                <Zap className={`w-5 h-5 ${kpis.overdues > 0 ? 'text-violet-600' : 'text-violet-500'}`} />
-              </div>
-              <div className="min-w-0">
-                <p className={`text-sm font-semibold truncate ${kpis.overdues > 0 ? 'text-violet-800' : 'text-gray-900'}`}>
-                  Tâches
-                </p>
-                <p className={`text-xs truncate ${kpis.overdues > 0 ? 'text-violet-600' : 'text-slate-400'}`}>
-                  {kpis.overdues > 0
-                    ? `${kpis.overdues} dossier${kpis.overdues > 1 ? 's' : ''} en retard`
-                     : 'Tâches & suivi'}
-                </p>
-              </div>
-            </button>
-            <button
-              onClick={() => navigate('/action-center')}
-              title="Voir les tâches en retard"
-              className="w-7 h-7 bg-violet-50 hover:bg-violet-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
-            >
-              <Plus className="w-4 h-4 text-violet-600" />
-            </button>
-          </div>
-
-          {/* Relances */}
+          {/* Email Engine */}
           <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-3 hover:shadow-md transition-all group">
             <button
-              onClick={() => navigate('/relances-critiques')}
+              onClick={() => navigate('/email-engine')}
               className="flex items-center gap-3 flex-1 min-w-0 text-left"
             >
-              <div className="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Bell className="w-5 h-5 text-orange-500" />
+              <div className="w-9 h-9 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <AtSign className="w-5 h-5 text-teal-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">Relances</p>
-                <p className="text-xs text-slate-400 truncate">Relances critiques</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">Email Engine</p>
+                <p className="text-xs text-slate-400 truncate">Moteur et historique des emails envoyés</p>
               </div>
             </button>
             <button
-              onClick={() => navigate('/relances-critiques')}
-              title="Voir les relances"
-              className="w-7 h-7 bg-orange-50 hover:bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+              onClick={() => navigate('/email-engine')}
+              title="Voir l'historique des emails"
+              className="w-7 h-7 bg-teal-50 hover:bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
             >
-              <Plus className="w-4 h-4 text-orange-500" />
+              <Plus className="w-4 h-4 text-teal-600" />
             </button>
           </div>
         </div>
@@ -591,7 +589,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               ? 'bg-red-50/50 border-red-200/60 hover:border-red-300'
               : 'bg-white border-slate-200/60 hover:border-red-200'
           }`}
-          onClick={() => navigate('/taches-overdue')}
+          onClick={() => navigate('/action-center')}
         >
           <div className="flex items-center justify-between mb-3">
             <p className={`text-sm font-medium ${kpis.blockers.length > 0 ? 'text-red-600' : 'text-slate-500'}`}>
