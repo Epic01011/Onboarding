@@ -183,6 +183,15 @@ function extractDept(zone: string): string | undefined {
   return /^\d{2,3}$/.test(zone.trim()) ? zone.trim() : undefined;
 }
 
+// ─── Helper: parse a "Prénom Nom" string into a minimal ProspectDirigeant ─────
+
+function parseContactNameToDirigeant(contactName: string): ProspectDirigeant {
+  const parts = contactName.trim().split(/\s+/);
+  const prenom = parts.length > 1 ? parts.slice(0, -1).join(' ') : '';
+  const nom    = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+  return { prenom, nom, qualite: '' };
+}
+
 // ─── Helper: convert DB ProspectRow → local LeadEntry ─────────────────────────
 
 function storeRowToLead(
@@ -211,14 +220,7 @@ function storeRowToLead(
     categorieEntreprise:   p.categorie_entreprise ?? '',
     dirigeants:            (p.dirigeants ?? []) as ProspectDirigeant[],
     dirigeantPrincipal:    (p.dirigeant_principal as ProspectDirigeant | null) ??
-                           (p.contact_name
-                             ? (() => {
-                                 const parts = p.contact_name!.trim().split(/\s+/);
-                                 const prenom = parts.length > 1 ? parts.slice(0, -1).join(' ') : '';
-                                 const nom    = parts.length > 1 ? parts[parts.length - 1] : parts[0];
-                                 return { prenom, nom, qualite: '' } as ProspectDirigeant;
-                               })()
-                             : null),
+                           (p.contact_name ? parseContactNameToDirigeant(p.contact_name) : null),
     email:                 p.contact_email ?? '',
     telephone:             p.telephone ?? '',
   };
