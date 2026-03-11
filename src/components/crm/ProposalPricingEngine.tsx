@@ -261,7 +261,13 @@ export function ProposalPricingEngine({ overrideDrivers = {}, prospectId }: Prop
         {
           clientName: clientData.raisonSociale || clientData.nom,
           clientEmail: clientData.email || undefined,
-          siret: clientData.siren || undefined,
+          siren: clientData.siren || undefined,
+          siret: clientData.siret || undefined,
+          raisonSociale: clientData.raisonSociale || undefined,
+          nomContact: clientData.nom || undefined,
+          adresse: clientData.adresse || undefined,
+          codePostal: clientData.codePostal || undefined,
+          ville: clientData.ville || undefined,
           legalForm: clientData.formeJuridique || undefined,
         },
         {
@@ -295,7 +301,7 @@ export function ProposalPricingEngine({ overrideDrivers = {}, prospectId }: Prop
         // but warn the user that the Supabase save failed.
         toast.error(`Sauvegarde Supabase échouée : ${supabaseResult.error}. Régénérez la proposition pour réessayer.`);
       } else if (prospectId) {
-        // Advance the prospect to 'en-negociation' in the Kanban
+        // Advance the existing prospect to 'en-negociation' in the Kanban
         const kanbanResult = await useProspectStore.getState().updateProspectFields(prospectId, {
           pricing_data: pricing as unknown as Record<string, unknown>,
           kanban_column: 'en-negociation',
@@ -304,6 +310,28 @@ export function ProposalPricingEngine({ overrideDrivers = {}, prospectId }: Prop
         });
         if (!kanbanResult.success) {
           toast.error(`Mise à jour du Kanban échouée : ${kanbanResult.error}`);
+        }
+      } else {
+        // No existing CRM prospect — create one so the lead appears in the Kanban
+        const addResult = await useProspectStore.getState().addProspect({
+          company_name: clientData.raisonSociale || clientData.nom || 'Nouveau prospect',
+          siren: clientData.siren || null,
+          siret: clientData.siret || null,
+          contact_name: clientData.nom || null,
+          contact_email: clientData.email || null,
+          contact_phone: clientData.telephone || null,
+          address: clientData.adresse || null,
+          postal_code: clientData.codePostal || null,
+          city: clientData.ville || null,
+          legal_form: clientData.formeJuridique || null,
+          status: 'en-negociation',
+          kanban_column: 'en-negociation',
+          pricing_data: pricing as unknown as Record<string, unknown>,
+          estimated_value: pricing.totalAnnuel,
+          source: 'pricing',
+        });
+        if (!addResult.success) {
+          toast.error(`Création du prospect CRM échouée : ${addResult.error}`);
         }
       }
 
