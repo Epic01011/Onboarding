@@ -8,7 +8,7 @@ import {
 import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
-  Radar, Cog, X, BookOpen, Handshake, FolderKanban,
+  Radar, Cog, BookOpen, Handshake,
   HardDrive, Send, Zap, ChevronDown, AtSign,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
@@ -54,7 +54,6 @@ const TODAY = new Date().toLocaleDateString('fr-FR', {
 export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, sentQuotesMrr = 0, sentQuotesCount = 0 }: HomeDashboardProps) {
   const navigate = useNavigate();
   const { dossiers, createDossier, loading } = useDossiersContext();
-  const [showNewDossierModal, setShowNewDossierModal] = useState(false);
   const [creatingDossier, setCreatingDossier] = useState(false);
 
   const kpis = useMemo(() => {
@@ -156,20 +155,8 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
     });
   }, [dossiers]);
 
-  const handleNewProspect = async () => {
-    setCreatingDossier(true);
-    setShowNewDossierModal(false);
-    try {
-      const dossier = await createDossier();
-      navigate(`/onboarding/${dossier.id}`);
-    } finally {
-      setCreatingDossier(false);
-    }
-  };
-
   const handleNewReprise = async () => {
     setCreatingDossier(true);
-    setShowNewDossierModal(false);
     try {
       const dossier = await createDossier();
       navigate(`/onboarding/${dossier.id}?mission=reprise`);
@@ -180,7 +167,6 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
 
   const handleNewCreation = async () => {
     setCreatingDossier(true);
-    setShowNewDossierModal(false);
     try {
       const dossier = await createDossier();
       navigate(`/onboarding/${dossier.id}?mission=creation`);
@@ -361,29 +347,52 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
             Intégration — Collecte & validation
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Nouveau Dossier / Onboarding */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Onboarding & Reprise */}
           <div className="flex items-center gap-3 bg-white border border-indigo-100 rounded-xl p-3 hover:shadow-md transition-all group">
             <button
-              onClick={() => navigate('/dossiers-actifs')}
+              onClick={() => navigate('/dossiers-actifs?filter=reprise')}
               className="flex items-center gap-3 flex-1 min-w-0 text-left"
             >
               <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FolderKanban className="w-5 h-5 text-indigo-600" />
+                <RefreshCw className="w-5 h-5 text-indigo-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">Nouveaux Dossiers</p>
-                <p className="text-xs text-slate-400 truncate">
-                  {kpis.clientsActifs > 0 ? `${kpis.clientsActifs} dossier${kpis.clientsActifs > 1 ? 's' : ''} en cours` : 'Créer & suivre les dossiers'}
-                </p>
+                <p className="text-sm font-semibold text-gray-900 truncate">Onboarding &amp; Reprise</p>
+                <p className="text-xs text-slate-400 truncate">Clients existants (SIREN)</p>
               </div>
             </button>
             <button
-              onClick={() => setShowNewDossierModal(true)}
-              title="Nouveau dossier"
-              className="w-7 h-7 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+              onClick={handleNewReprise}
+              disabled={creatingDossier}
+              title="Nouveau dossier reprise"
+              className="w-7 h-7 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-60"
             >
               <Plus className="w-4 h-4 text-indigo-600" />
+            </button>
+          </div>
+
+          {/* Création d'entreprise */}
+          <div className="flex items-center gap-3 bg-white border border-indigo-100 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/dossiers-actifs?filter=creation')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Création d'entreprise</p>
+                <p className="text-xs text-slate-400 truncate">Nouveaux statuts juridiques</p>
+              </div>
+            </button>
+            <button
+              onClick={handleNewCreation}
+              disabled={creatingDossier}
+              title="Nouveau dossier création"
+              className="w-7 h-7 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-60"
+            >
+              <Plus className="w-4 h-4 text-blue-600" />
             </button>
           </div>
 
@@ -398,7 +407,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">Reprise Confraternelle</p>
-                <p className="text-xs text-slate-400 truncate">Lettres confraternelles</p>
+                <p className="text-xs text-slate-400 truncate">Passation cabinet</p>
               </div>
             </button>
             <button
@@ -718,75 +727,6 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
         </div>
       )}
 
-      {/* ── Nouveau Dossier Modal ─────────────────────────────────────── */}
-      {showNewDossierModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Choisir le type de mission</h2>
-              <button
-                onClick={() => setShowNewDossierModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={handleNewReprise}
-                disabled={creatingDossier}
-                className="flex items-start gap-4 p-5 rounded-xl border-2 border-gray-200 hover:border-amber-400 hover:bg-amber-50 transition-all text-left group disabled:opacity-60"
-              >
-                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors">
-                  <RefreshCw className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                    Reprise de dossier
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Client existant avec SIREN
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={handleNewCreation}
-                disabled={creatingDossier}
-                className="flex items-start gap-4 p-5 rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left group disabled:opacity-60"
-              >
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
-                    Création d'entreprise
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nouveau client sans SIREN
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={handleNewProspect}
-                disabled={creatingDossier}
-                className="flex items-start gap-4 p-5 rounded-xl border-2 border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all text-left group disabled:opacity-60"
-              >
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
-                  <FolderKanban className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
-                    Nouveau prospect
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Dossier vierge à compléter
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
