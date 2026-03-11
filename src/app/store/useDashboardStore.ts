@@ -22,9 +22,18 @@ import {
   DunningStep,
   N8nJob,
   UrgencySemantic,
+  ProductionStep,
 } from '../types/dashboard';
 import { apiClient, ApiError } from '../utils/apiClient';
 import { toast } from 'sonner';
+import { fetchAccountingYears } from '../services/pennylaneApi';
+import {
+  upsertBalanceSheet,
+  getBalanceSheets,
+  updateBalanceSheetProduction,
+  type BalanceSheetRecord,
+} from '../utils/supabaseSync';
+import { supabase } from '../utils/supabaseClient';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -159,6 +168,13 @@ interface DashboardStore {
   dunningSteps: DunningStep[];
   pendingJobs: N8nJob[];
 
+  /** Balance sheet records from Supabase (enriched from Pennylane sync) */
+  balanceSheets: BalanceSheetRecord[];
+  /** True while syncBalanceSheetData is running */
+  syncingBalanceSheets: boolean;
+  /** ISO timestamp of last successful Pennylane sync */
+  lastBalanceSheetSync: string | null;
+
   loadingClients: boolean;
   loadingFiscalTasks: boolean;
   loadingEmailDrafts: boolean;
@@ -181,6 +197,34 @@ interface DashboardStore {
 
   fetchDunningSteps: () => Promise<void>;
   cancelDunningStep: (id: string) => Promise<void>;
+
+  /**
+   * Fetches accounting years from Pennylane, computes due_date and urgency,
+   * persists each record to Supabase `balance_sheets`, then reloads local state.
+   * Shows toast notifications on success/failure.
+   */
+  syncBalanceSheetData: () => Promise<void>;
+
+  /**
+   * Loads balance sheets previously stored in Supabase (no Pennylane call).
+   * Used on initial mount to restore state from the DB.
+   */
+  loadBalanceSheetsFromSupabase: () => Promise<void>;
+
+  /**
+   * Updates the production step and/or assigned manager of a single balance
+   * sheet record, both locally and in Supabase.
+   */
+  updateBalanceSheet: (
+    pennylaneId: string,
+    updates: { productionStep?: ProductionStep; assignedManager?: string; notes?: string }
+  ) => Promise<void>;
+
+  /**
+   * Returns balance sheets sorted by proximity to closing_date (soonest first).
+   * Selector — call inside a component with useDashboardStore(s => s.getProductionPlanning()).
+   */
+  getProductionPlanning: () => BalanceSheetRecord[];
 }
 
 // ─── Store implementation ─────────────────────────────────────────────────────
@@ -192,6 +236,9 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   pricingProposals: [],
   dunningSteps: [],
   pendingJobs: [],
+  balanceSheets: [],
+  syncingBalanceSheets: false,
+  lastBalanceSheetSync: null,
   loadingClients: false,
   loadingFiscalTasks: false,
   loadingEmailDrafts: false,
@@ -406,5 +453,150 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       if (prev) set(s => ({ dunningSteps: s.dunningSteps.map(d => (d.id === id ? prev : d)) }));
       toast.error("Erreur lors de l'annulation de la relance.");
     }
+  },
+
+  // ── Balance Sheets (Suivi des Bilans — Pennylane + Supabase) ─────────────────
+
+  syncBalanceSheetData: async () => {
+    set({ syncingBalanceSheets: true });
+
+    // Get current authenticated user for Supabase writes
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      set({ syncingBalanceSheets: false });
+      toast.error('Vous devez être connecté pour synchroniser les bilans.');
+      return;
+    }
+
+    // 1. Fetch accounting years from Pennylane
+    const result = await fetchAccountingYears();
+
+    if (!result.success || !result.data) {
+      set({ syncingBalanceSheets: false });
+      toast.error(`Pennylane : ${result.error ?? 'Impossible de récupérer les exercices comptables.'}`);
+      return;
+    }
+
+    const years = result.data;
+    const now = new Date().toISOString();
+    const syncErrors: string[] = [];
+
+    // 2. For each accounting year, compute due_date (closing + 4 months), urgency, upsert to Supabase
+    for (const year of years) {
+      const closingDate = new Date(year.closing_date);
+      const dueDateObj = new Date(closingDate);
+      dueDateObj.setMonth(dueDateObj.getMonth() + 4);
+      const dueDate = dueDateObj.toISOString().split('T')[0];
+
+      // Map Pennylane status → production_step default (if new record)
+      const existingRecord = get().balanceSheets.find(b => b.pennylaneId === year.id);
+      const productionStep: ProductionStep = existingRecord?.productionStep ?? (
+        year.status === 'closed' ? 'certified' :
+        year.status === 'closing_in_progress' ? 'revision' :
+        'not_started'
+      );
+
+      const urgencySemantic: UrgencySemantic = computeUrgency(dueDate);
+
+      const record: BalanceSheetRecord = {
+        userId: user.id,
+        pennylaneId: year.id,
+        customerId: year.customer_id,
+        customerName: year.customer_name,
+        startDate: year.start_date,
+        closingDate: year.closing_date,
+        pennylaneStatus: year.status,
+        productionStep,
+        assignedManager: existingRecord?.assignedManager,
+        dueDate,
+        urgencySemantic,
+        notes: existingRecord?.notes,
+        syncedAt: now,
+      };
+
+      const syncResult = await upsertBalanceSheet(record);
+      if (!syncResult.success) {
+        syncErrors.push(`${year.customer_name}: ${syncResult.error}`);
+      }
+    }
+
+    // 3. Reload from Supabase so UI reflects persisted state
+    const fetchResult = await getBalanceSheets(user.id);
+    if (fetchResult.success) {
+      set({
+        balanceSheets: fetchResult.data,
+        syncingBalanceSheets: false,
+        lastBalanceSheetSync: now,
+      });
+    } else {
+      set({ syncingBalanceSheets: false, lastBalanceSheetSync: now });
+    }
+
+    // 4. Notify result
+    if (syncErrors.length > 0) {
+      toast.error(`Sync Pennylane partielle — ${syncErrors.length} erreur(s) : ${syncErrors[0]}`);
+    } else {
+      const isDemo = result.demo;
+      toast.success(
+        isDemo
+          ? `Sync Pennylane (démo) — ${years.length} bilan(s) synchronisé(s)`
+          : `Sync Pennylane — ${years.length} bilan(s) mis à jour`
+      );
+    }
+  },
+
+  loadBalanceSheetsFromSupabase: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const result = await getBalanceSheets(user.id);
+    if (result.success) {
+      set({ balanceSheets: result.data });
+    }
+  },
+
+  updateBalanceSheet: async (
+    pennylaneId: string,
+    updates: { productionStep?: ProductionStep; assignedManager?: string; notes?: string }
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('Vous devez être connecté pour modifier un bilan.');
+      return;
+    }
+
+    // Optimistic update
+    set(s => ({
+      balanceSheets: s.balanceSheets.map(b =>
+        b.pennylaneId === pennylaneId
+          ? {
+              ...b,
+              ...(updates.productionStep !== undefined && { productionStep: updates.productionStep }),
+              ...(updates.assignedManager !== undefined && { assignedManager: updates.assignedManager }),
+              ...(updates.notes !== undefined && { notes: updates.notes }),
+              updatedAt: new Date().toISOString(),
+            }
+          : b
+      ),
+    }));
+
+    const result = await updateBalanceSheetProduction(user.id, pennylaneId, {
+      productionStep: updates.productionStep,
+      assignedManager: updates.assignedManager,
+      notes: updates.notes,
+    });
+
+    if (!result.success) {
+      // Roll back optimistic update by reloading from Supabase
+      const fetchResult = await getBalanceSheets(user.id);
+      if (fetchResult.success) set({ balanceSheets: fetchResult.data });
+      toast.error(`Erreur mise à jour bilan : ${result.error}`);
+    }
+  },
+
+  getProductionPlanning: () => {
+    return [...get().balanceSheets].sort((a, b) =>
+      new Date(a.closingDate).getTime() - new Date(b.closingDate).getTime()
+    );
   },
 }));
