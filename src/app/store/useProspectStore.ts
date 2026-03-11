@@ -79,9 +79,17 @@ export interface ProspectRow {
   open_count: number;
   clicked: boolean;
   email_sent_at: string | null;
+  /** Timestamp of the first email open (real tracking date) */
+  opened_at: string | null;
+  /** Timestamp of the first link click (real tracking date) */
+  clicked_at: string | null;
   icebreaker_ia: string | null;
   sequence_step: number;
   next_follow_up_date: string | null;
+  /** Event RSVP status for Événements Locaux */
+  event_status: string | null;
+  /** Direct LinkedIn profile URL (when known) */
+  linkedin_url: string | null;
   source: string | null;
   notes: string | null;
   user_id: string | null;
@@ -134,9 +142,17 @@ export interface ProspectInput {
   open_count?: number | null;
   clicked?: boolean | null;
   email_sent_at?: string | null;
+  /** Timestamp of the first email open (real tracking date) */
+  opened_at?: string | null;
+  /** Timestamp of the first link click (real tracking date) */
+  clicked_at?: string | null;
   icebreaker_ia?: string | null;
   sequence_step?: number | null;
   next_follow_up_date?: string | null;
+  /** Event RSVP status for Événements Locaux */
+  event_status?: string | null;
+  /** Direct LinkedIn profile URL (when known) */
+  linkedin_url?: string | null;
   /** Score de chaleur du lead (0-100) */
   score?: number | null;
   /** Valeur financière estimée du contrat (€) */
@@ -183,6 +199,14 @@ interface ProspectStore {
   updateProspectFields: (
     id: string,
     fields: Partial<ProspectInput>
+  ) => Promise<ProspectSyncResult>;
+
+  /**
+   * Convenience wrapper: update only the RSVP event_status of a prospect.
+   */
+  updateEventStatus: (
+    id: string,
+    eventStatus: string
   ) => Promise<ProspectSyncResult>;
 
   deleteProspect: (id: string) => Promise<ProspectSyncResult>;
@@ -463,6 +487,15 @@ export const useProspectStore = create<ProspectStore>((set, get) => ({
       console.warn('[useProspectStore] updateProspectFields exception:', message);
       return { success: false, error: message };
     }
+  },
+
+  // ── updateEventStatus ───────────────────────────────────────────────────────
+
+  updateEventStatus: async (
+    id: string,
+    eventStatus: string
+  ): Promise<ProspectSyncResult> => {
+    return get().updateProspectFields(id, { event_status: eventStatus });
   },
 
   // ── deleteProspect ──────────────────────────────────────────────────────────
