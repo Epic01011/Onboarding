@@ -210,7 +210,15 @@ function storeRowToLead(
     capitalSocial:         p.capital_social ?? '',
     categorieEntreprise:   p.categorie_entreprise ?? '',
     dirigeants:            (p.dirigeants ?? []) as ProspectDirigeant[],
-    dirigeantPrincipal:    (p.dirigeant_principal ?? null) as ProspectDirigeant | null,
+    dirigeantPrincipal:    (p.dirigeant_principal as ProspectDirigeant | null) ??
+                           (p.contact_name
+                             ? (() => {
+                                 const parts = p.contact_name!.trim().split(/\s+/);
+                                 const prenom = parts.length > 1 ? parts.slice(0, -1).join(' ') : '';
+                                 const nom    = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+                                 return { prenom, nom, qualite: '' } as ProspectDirigeant;
+                               })()
+                             : null),
     email:                 p.contact_email ?? '',
     telephone:             p.telephone ?? '',
   };

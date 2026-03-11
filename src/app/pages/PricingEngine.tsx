@@ -2048,7 +2048,7 @@ function SavedQuoteCard({
       // CRM: convert the matching prospect to a client
       convertProspectToClient({
         siren: quote.siren,
-        companyName: quote.clientName,
+        companyName: quote.raisonSociale || quote.clientName,
         contactEmail: quote.contactEmail,
         pricingData: quote as unknown as Record<string, unknown>,
       }).then(convResult => {
@@ -2072,7 +2072,7 @@ function SavedQuoteCard({
     setLinkingProspect(true);
     const result = await saveProposalToProspect({
       siren: quote.siren || undefined,
-      companyName: quote.clientName,
+      companyName: quote.raisonSociale || quote.clientName,
       contactEmail: quote.contactEmail || undefined,
       pricingData: quote as unknown as Record<string, unknown>,
     });
@@ -2351,7 +2351,7 @@ export function PricingEngine() {
       const contactName = [companyProfile.prenomContact, companyProfile.nomContact].filter(Boolean).join(' ') || undefined;
       const saveResult = await saveProspectAndQuote(
         {
-          companyName: effectiveName,
+          companyName: companyProfile.raisonSociale || effectiveName,
           siren: companyProfile.siren || null,
           address: companyProfile.adresse || null,
           city: companyProfile.ville || null,
@@ -2420,7 +2420,7 @@ export function PricingEngine() {
       if (status === 'VALIDATED' || status === 'SIGNED') {
         convertProspectToClient({
           siren: quote.siren,
-          companyName: quote.clientName,
+          companyName: quote.raisonSociale || quote.clientName,
           contactEmail: quote.contactEmail,
           pricingData: quote as unknown as Record<string, unknown>,
         }).then(convResult => {
