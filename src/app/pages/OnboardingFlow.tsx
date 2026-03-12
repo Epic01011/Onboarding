@@ -15,6 +15,12 @@ import { Step8 } from '../components/steps/Step8';
 import { Step9 } from '../components/steps/Step9';
 import { Step10 } from '../components/steps/Step10';
 import { Step11 } from '../components/steps/Step11';
+import { StepReprise1Prospect } from '../components/steps/StepReprise1Prospect';
+import { StepReprise2LDM } from '../components/steps/StepReprise2LDM';
+import { StepReprise3Confraternelle } from '../components/steps/StepReprise3Confraternelle';
+import { StepReprise4Collecte } from '../components/steps/StepReprise4Collecte';
+import { StepReprise5Connectivite } from '../components/steps/StepReprise5Connectivite';
+import { StepReprise6Cloture } from '../components/steps/StepReprise6Cloture';
 import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { useOnboardingDraftStore } from '../store/useOnboardingDraftStore';
 import { useProspectStore } from '../store/useProspectStore';
@@ -34,9 +40,20 @@ const STEP_COMPONENTS: Record<number, React.ComponentType> = {
   11: Step11,
 };
 
+const REPRISE_STEP_COMPONENTS: Record<number, React.ComponentType> = {
+  1: StepReprise1Prospect,
+  2: StepReprise2LDM,
+  3: StepReprise3Confraternelle,
+  4: StepReprise4Collecte,
+  5: StepReprise5Connectivite,
+  6: StepReprise6Cloture,
+};
+
 function StepRenderer() {
-  const { currentStep } = useOnboarding();
-  const StepComponent = STEP_COMPONENTS[currentStep] ?? Step1;
+  const { currentStep, clientData } = useOnboarding();
+  const isReprise = clientData.missionType === 'reprise';
+  const map = isReprise ? REPRISE_STEP_COMPONENTS : STEP_COMPONENTS;
+  const StepComponent = map[currentStep] ?? Step1;
   return <StepComponent />;
 }
 
@@ -139,9 +156,11 @@ function OnboardingContent({ dossierId }: { dossierId: string }) {
   }, [clientData, currentStep, stepStatuses, isLoaded, debouncedSave]);
 
   // Auto-create a Prospect in Supabase on first meaningful input (transparent to the user)
+  // Skipped for reprise missions — the prospect is explicitly selected in step 1.
   useEffect(() => {
     if (!isLoaded) return;
     if (prospectCreatedRef.current) return;
+    if (clientData.missionType === 'reprise') return;
 
     const hasName = clientData.nom.trim().length > 0;
     const hasEmail = clientData.email.trim().length > 0;
