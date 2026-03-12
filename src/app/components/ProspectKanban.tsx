@@ -6,7 +6,7 @@
  * Lead scoring badges : 🔥 Chaud (≥70), 🟡 Tiède (≥40), 🧊 Froid (<40).
  */
 
-import { useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import {
   Mail, Phone, Building2, Calendar, Eye, MousePointerClick,
@@ -60,7 +60,7 @@ const COLUMNS: Array<{ id: KanbanColumn; label: string; color: string; bg: strin
 
 // ─── Lead heat badge ──────────────────────────────────────────────────────────
 
-function HeatBadge({ score }: { score?: number }) {
+const HeatBadge = memo(function HeatBadge({ score }: { score?: number }) {
   if (score == null) return null;
   if (score >= 70) {
     return (
@@ -81,11 +81,11 @@ function HeatBadge({ score }: { score?: number }) {
       🧊
     </span>
   );
-}
+});
 
 // ─── Draggable Card ───────────────────────────────────────────────────────────
 
-function ProspectCard({
+const ProspectCard = memo(function ProspectCard({
   lead,
   index,
   onCardClick,
@@ -211,11 +211,11 @@ function ProspectCard({
       )}
     </Draggable>
   );
-}
+});
 
 // ─── Droppable Column ─────────────────────────────────────────────────────────
 
-function KanbanColumnArea({
+const KanbanColumnArea = memo(function KanbanColumnArea({
   column,
   leads,
   onCardClick,
@@ -263,7 +263,7 @@ function KanbanColumnArea({
       </Droppable>
     </div>
   );
-}
+});
 
 // ─── Main Kanban Board ────────────────────────────────────────────────────────
 
@@ -279,14 +279,14 @@ export function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanba
     return grouped;
   }, [leads]);
 
-  function handleDragEnd(result: DropResult) {
+  const handleDragEnd = useCallback((result: DropResult) => {
     const { destination, draggableId } = result;
     if (!destination) return;
     const targetColumn = destination.droppableId as KanbanColumn;
     const lead = leads.find(l => l.id === draggableId);
     if (!lead || lead.kanbanColumn === targetColumn) return;
     onMoveCard(draggableId, targetColumn);
-  }
+  }, [leads, onMoveCard]);
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
