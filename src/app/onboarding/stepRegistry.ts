@@ -10,6 +10,62 @@ export interface StepDef {
 }
 
 /**
+ * Flux linéaire dédié à la Création de société (7 étapes).
+ * Utilisé à la place de ALL_STEPS quand missionType === 'creation'.
+ */
+export const CREATION_STEPS: StepDef[] = [
+  {
+    id: 'creation-prospect',
+    label: 'Sélection du Prospect',
+    component: 'StepCreation1Prospect',
+    isBlocking: true,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-cadrage',
+    label: 'Cadrage & Projet',
+    component: 'StepCreation2Cadrage',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-collecte',
+    label: 'Collecte Documentaire',
+    component: 'StepCreation3Collecte',
+    isBlocking: true,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-signature',
+    label: 'Signature Électronique',
+    component: 'StepCreation4Signature',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-formalites',
+    label: 'Formalités Légales',
+    component: 'StepCreation5Formalites',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-suivi-kbis',
+    label: 'Suivi & Dépôt Kbis',
+    component: 'StepCreation6SuiviKbis',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+  {
+    id: 'creation-cloture',
+    label: 'Connectivité & Clôture',
+    component: 'StepCreation7Cloture',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'creation',
+  },
+];
+
+/**
  * Registre global de toutes les étapes disponibles.
  * isApplicable() détermine dynamiquement si l'étape est incluse dans le parcours
  * selon les données client (missionType, hasPayroll, hasVAT, etc.).
