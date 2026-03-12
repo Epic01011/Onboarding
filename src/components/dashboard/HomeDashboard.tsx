@@ -10,7 +10,7 @@ import {
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, BookOpen, Handshake,
   HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert, TrendingUp,
-  UserPlus,
+  UserPlus, ClipboardList,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -672,6 +672,29 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
               className="w-7 h-7 bg-teal-50 hover:bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
             >
               <Plus className="w-4 h-4 text-teal-600" />
+            </button>
+          </div>
+
+          {/* Gestionnaire de tâches */}
+          <div className="flex items-center gap-3 bg-white border border-slate-200/60 rounded-xl p-3 hover:shadow-md transition-all group">
+            <button
+              onClick={() => navigate('/task-manager')}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ClipboardList className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">Gestionnaire de tâches</p>
+                <p className="text-xs text-slate-400 truncate">Organisation &amp; productivité équipe</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/task-manager')}
+              title="Nouvelle tâche"
+              className="w-7 h-7 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-blue-600" />
             </button>
           </div>
         </div>

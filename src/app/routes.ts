@@ -172,6 +172,13 @@ export const router = createBrowserRouter([
           return { Component: HabilitationsFiscales };
         },
       },
+      {
+        path: "task-manager",
+        lazy: async () => {
+          const m = await import('./pages/TaskManager');
+          return { Component: m.default };
+        },
+      },
     ],
   },
   // Public route — client portal (magic link)
