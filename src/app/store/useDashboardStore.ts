@@ -217,7 +217,7 @@ interface DashboardStore {
    */
   updateBalanceSheet: (
     pennylaneId: string,
-    updates: { productionStep?: ProductionStep; assignedManager?: string; notes?: string }
+    updates: { productionStep?: ProductionStep; assignedManager?: string }
   ) => Promise<void>;
 
   /**
@@ -510,8 +510,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         assignedManager: existingRecord?.assignedManager,
         dueDate,
         urgencySemantic,
-        notes: existingRecord?.notes,
-        syncedAt: now,
       };
 
       const syncResult = await upsertBalanceSheet(record);
@@ -557,7 +555,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   updateBalanceSheet: async (
     pennylaneId: string,
-    updates: { productionStep?: ProductionStep; assignedManager?: string; notes?: string }
+    updates: { productionStep?: ProductionStep; assignedManager?: string }
   ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -573,7 +571,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
               ...b,
               ...(updates.productionStep !== undefined && { productionStep: updates.productionStep }),
               ...(updates.assignedManager !== undefined && { assignedManager: updates.assignedManager }),
-              ...(updates.notes !== undefined && { notes: updates.notes }),
               updatedAt: new Date().toISOString(),
             }
           : b
@@ -583,7 +580,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     const result = await updateBalanceSheetProduction(user.id, pennylaneId, {
       productionStep: updates.productionStep,
       assignedManager: updates.assignedManager,
-      notes: updates.notes,
     });
 
     if (!result.success) {
