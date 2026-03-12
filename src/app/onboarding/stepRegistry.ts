@@ -10,6 +10,55 @@ export interface StepDef {
 }
 
 /**
+ * Registre des 6 étapes du flux "Reprise de dossier".
+ * Ces étapes remplacent ALL_STEPS lorsque missionType === 'reprise'.
+ */
+export const REPRISE_STEPS: StepDef[] = [
+  {
+    id: 'prospect-selection',
+    label: 'Sélection Prospect',
+    component: 'StepReprise1Prospect',
+    isBlocking: true,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+  {
+    id: 'ldm-generation',
+    label: 'Lettre de Mission',
+    component: 'StepReprise2LDM',
+    isBlocking: true,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+  {
+    id: 'confraternelle',
+    label: 'Reprise Confraternelle',
+    component: 'StepReprise3Confraternelle',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+  {
+    id: 'collecte-fiscale',
+    label: 'Collecte & Accès Fiscaux',
+    component: 'StepReprise4Collecte',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+  {
+    id: 'connectivite',
+    label: 'Connectivité & Pennylane',
+    component: 'StepReprise5Connectivite',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+  {
+    id: 'cloture',
+    label: 'Clôture Onboarding',
+    component: 'StepReprise6Cloture',
+    isBlocking: false,
+    isApplicable: (cd) => cd.missionType === 'reprise',
+  },
+];
+
+/**
  * Registre global de toutes les étapes disponibles.
  * isApplicable() détermine dynamiquement si l'étape est incluse dans le parcours
  * selon les données client (missionType, hasPayroll, hasVAT, etc.).

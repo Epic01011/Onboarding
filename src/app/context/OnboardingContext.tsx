@@ -27,6 +27,17 @@ export const STEP_CONFIGS: StepConfig[] = [
   { id: 'step10', title: 'Provisionnement Pennylane',            short: 'Compte + mandat SEPA',         type: 'auto',   icon: 'Database'      },
   { id: 'step11', title: "Clôture de l'Onboarding",             short: 'Email bienvenue + suivi',      type: 'celebr', icon: 'Trophy'        },
 ];
+
+/** 6-step linear flow for "Reprise de dossier" missions. */
+export const REPRISE_STEP_CONFIGS: StepConfig[] = [
+  { id: 'prospect-selection', title: 'Sélection du Prospect',   short: 'Import depuis le CRM',          type: '',       icon: 'UserSearch' },
+  { id: 'ldm-generation',     title: 'Lettre de Mission',        short: 'Génération & signature LDM',    type: 'auto',   icon: 'PenLine'    },
+  { id: 'confraternelle',     title: 'Reprise Confraternelle',   short: 'Lettre confrère OEC',           type: 'auto',   icon: 'Scale'      },
+  { id: 'collecte-fiscale',   title: 'Collecte & Accès Fiscaux', short: 'Pièces + identifiants fiscaux', type: '',       icon: 'FolderOpen' },
+  { id: 'connectivite',       title: 'Connectivité & Pennylane', short: 'GED + intégrations',            type: 'cond',   icon: 'Database'   },
+  { id: 'cloture',            title: "Clôture de l'Onboarding",  short: 'Finalisation & activation',     type: 'celebr', icon: 'Trophy'     },
+];
+export const REPRISE_TOTAL_STEPS = REPRISE_STEP_CONFIGS.length;
 export type StepStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'error';
 
 export type FormeJuridiqueCreation = 'SAS' | 'SASU' | 'SARL' | 'EURL' | 'SCI' | 'SA' | '';
@@ -232,6 +243,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const currentStepRef = useRef(currentStep);
   currentStepRef.current = currentStep;
 
+  // Derive flow config from missionType — reactive to clientData updates
+  const isReprise = clientData.missionType === 'reprise';
+  const totalSteps = isReprise ? REPRISE_TOTAL_STEPS : TOTAL_STEPS;
+  const activeSteps = isReprise ? REPRISE_STEP_CONFIGS : STEP_CONFIGS;
+  const totalStepsRef = useRef(totalSteps);
+  totalStepsRef.current = totalSteps;
+
   const updateClientData = useCallback((data: Partial<ClientData>) => {
     setClientData(prev => ({ ...prev, ...data }));
   }, []);
@@ -249,6 +267,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const goNext = useCallback(() => {
     const step = currentStepRef.current;
     const isCreation = clientDataRef.current.missionType === 'creation';
+    const total = totalStepsRef.current;
 
     setStepStatuses(prev => {
       const u = [...prev];
@@ -257,7 +276,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (step === 4 && isCreation) {
         u[4] = 'skipped';
         if (u[5] === 'pending') u[5] = 'active';
-      } else if (step < TOTAL_STEPS) {
+      } else if (step < total) {
         if (u[step] === 'pending') u[step] = 'active';
       }
       return u;
@@ -265,7 +284,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
     if (step === 4 && isCreation) {
       setCurrentStep(6);
-    } else if (step < TOTAL_STEPS) {
+    } else if (step < total) {
       setCurrentStep(step + 1);
     }
   }, []);
@@ -287,8 +306,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   return (
     <OnboardingContext.Provider value={{
-      currentStep, clientData, stepStatuses, totalSteps: TOTAL_STEPS,
-      activeSteps: STEP_CONFIGS,
+      currentStep, clientData, stepStatuses, totalSteps,
+      activeSteps,
       goToStep, updateClientData, setStepStatus, goNext, goPrev, resetDemo,
     }}>
       {children}
