@@ -15,6 +15,13 @@ import { Step8 } from '../components/steps/Step8';
 import { Step9 } from '../components/steps/Step9';
 import { Step10 } from '../components/steps/Step10';
 import { Step11 } from '../components/steps/Step11';
+import { StepCreation1Prospect } from '../components/steps/StepCreation1Prospect';
+import { StepCreation2Cadrage } from '../components/steps/StepCreation2Cadrage';
+import { StepCreation3Collecte } from '../components/steps/StepCreation3Collecte';
+import { StepCreation4Signature } from '../components/steps/StepCreation4Signature';
+import { StepCreation5Formalites } from '../components/steps/StepCreation5Formalites';
+import { StepCreation6SuiviKbis } from '../components/steps/StepCreation6SuiviKbis';
+import { StepCreation7Cloture } from '../components/steps/StepCreation7Cloture';
 import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { useOnboardingDraftStore } from '../store/useOnboardingDraftStore';
 import { useProspectStore } from '../store/useProspectStore';
@@ -34,9 +41,22 @@ const STEP_COMPONENTS: Record<number, React.ComponentType> = {
   11: Step11,
 };
 
+/** Components for the 7-step Création de société linear flow. */
+const CREATION_STEP_COMPONENTS: Record<number, React.ComponentType> = {
+  1: StepCreation1Prospect,
+  2: StepCreation2Cadrage,
+  3: StepCreation3Collecte,
+  4: StepCreation4Signature,
+  5: StepCreation5Formalites,
+  6: StepCreation6SuiviKbis,
+  7: StepCreation7Cloture,
+};
+
 function StepRenderer() {
-  const { currentStep } = useOnboarding();
-  const StepComponent = STEP_COMPONENTS[currentStep] ?? Step1;
+  const { currentStep, clientData } = useOnboarding();
+  const isCreation = clientData.missionType === 'creation';
+  const map = isCreation ? CREATION_STEP_COMPONENTS : STEP_COMPONENTS;
+  const StepComponent = map[currentStep] ?? Step1;
   return <StepComponent />;
 }
 

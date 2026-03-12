@@ -27,6 +27,17 @@ export const STEP_CONFIGS: StepConfig[] = [
   { id: 'step10', title: 'Provisionnement Pennylane',            short: 'Compte + mandat SEPA',         type: 'auto',   icon: 'Database'      },
   { id: 'step11', title: "Clôture de l'Onboarding",             short: 'Email bienvenue + suivi',      type: 'celebr', icon: 'Trophy'        },
 ];
+
+/** Step configurations for the Création de société linear flow (7 steps). */
+export const CREATION_STEP_CONFIGS: StepConfig[] = [
+  { id: 'creation-1', title: 'Sélection du Prospect',    short: 'Choix du prospect CRM',          type: '',       icon: 'UserCheck'  },
+  { id: 'creation-2', title: 'Cadrage & Projet',         short: 'Email détails société',          type: 'auto',   icon: 'Mail'       },
+  { id: 'creation-3', title: 'Collecte Documentaire',    short: 'Pièces identité & domicile',     type: '',       icon: 'Upload'     },
+  { id: 'creation-4', title: 'Signature Électronique',   short: 'Statuts & M0',                   type: 'auto',   icon: 'PenLine'    },
+  { id: 'creation-5', title: 'Formalités Légales',       short: 'Guichet + greffe',               type: 'cond',   icon: 'Scale'      },
+  { id: 'creation-6', title: 'Suivi & Dépôt Kbis',      short: 'Email client + Kbis',            type: '',       icon: 'FileCheck'  },
+  { id: 'creation-7', title: 'Connectivité & Clôture',  short: 'Pennylane + finalisation',       type: 'celebr', icon: 'Trophy'     },
+];
 export type StepStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'error';
 
 export type FormeJuridiqueCreation = 'SAS' | 'SASU' | 'SARL' | 'EURL' | 'SCI' | 'SA' | '';
@@ -156,6 +167,23 @@ export interface ClientData {
   crmDealId: string;
   /** True si le client a une paie (bulletins de salaire), déduit du devis */
   hasPayroll: boolean;
+  // ── Création de société — champs spécifiques au flux linéaire 7 étapes ──────
+  /** ID du prospect sélectionné à l'étape 1 du flux création */
+  creationProspectId: string;
+  /** Email de cadrage envoyé au client (étape 2) */
+  cadrageEmailSent: boolean;
+  /** Annonce légale publiée (étape 5) */
+  annonceLegalPubliee: boolean;
+  /** Dossier déposé au Greffe (étape 5) */
+  dossierDeposesGreffe: boolean;
+  /** Kbis définitif uploadé dans la GED (étape 6) */
+  kbisUploaded: boolean;
+  /** URL Sharepoint du Kbis définitif */
+  kbisUrl: string;
+  /** Email de suivi envoyé au client avant réception du Kbis (étape 6) */
+  kbisSuiviEmailSent: boolean;
+  /** Abonnement facturation activé (étape 7) */
+  facturationAbonnementActive: boolean;
 }
 
 const defaultDocuments: DocumentItem[] = [
@@ -198,6 +226,14 @@ export const defaultClientData: ClientData = {
   welcomeEmailSent: false,
   crmProvider: '', crmDealId: '',
   hasPayroll: false,
+  creationProspectId: '',
+  cadrageEmailSent: false,
+  annonceLegalPubliee: false,
+  dossierDeposesGreffe: false,
+  kbisUploaded: false,
+  kbisUrl: '',
+  kbisSuiviEmailSent: false,
+  facturationAbonnementActive: false,
 };
 
 interface OnboardingContextType {
@@ -216,6 +252,7 @@ interface OnboardingContextType {
 }
 
 export const TOTAL_STEPS = 11;
+export const CREATION_TOTAL_STEPS = 7;
 
 const OnboardingContext = createContext<OnboardingContextType | null>(null);
 
@@ -249,23 +286,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const goNext = useCallback(() => {
     const step = currentStepRef.current;
     const isCreation = clientDataRef.current.missionType === 'creation';
+    const totalSteps = isCreation ? CREATION_TOTAL_STEPS : TOTAL_STEPS;
 
     setStepStatuses(prev => {
       const u = [...prev];
       u[step - 1] = 'completed';
-
-      if (step === 4 && isCreation) {
-        u[4] = 'skipped';
-        if (u[5] === 'pending') u[5] = 'active';
-      } else if (step < TOTAL_STEPS) {
+      if (step < totalSteps) {
         if (u[step] === 'pending') u[step] = 'active';
       }
       return u;
     });
 
-    if (step === 4 && isCreation) {
-      setCurrentStep(6);
-    } else if (step < TOTAL_STEPS) {
+    if (step < totalSteps) {
       setCurrentStep(step + 1);
     }
   }, []);
@@ -273,9 +305,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const goPrev = useCallback(() => {
     const step = currentStepRef.current;
     if (step > 1) {
-      let prev = step - 1;
-      if (prev === 5 && clientDataRef.current.missionType === 'creation') prev = 4;
-      setCurrentStep(prev);
+      setCurrentStep(step - 1);
     }
   }, []);
 
@@ -285,10 +315,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setStepStatuses(['active', ...Array(TOTAL_STEPS - 1).fill('pending')]);
   }, []);
 
+  const isCreation = clientData.missionType === 'creation';
+  const activeTotalSteps = isCreation ? CREATION_TOTAL_STEPS : TOTAL_STEPS;
+  const activeStepConfigs = isCreation ? CREATION_STEP_CONFIGS : STEP_CONFIGS;
+
   return (
     <OnboardingContext.Provider value={{
-      currentStep, clientData, stepStatuses, totalSteps: TOTAL_STEPS,
-      activeSteps: STEP_CONFIGS,
+      currentStep, clientData, stepStatuses, totalSteps: activeTotalSteps,
+      activeSteps: activeStepConfigs,
       goToStep, updateClientData, setStepStatus, goNext, goPrev, resetDemo,
     }}>
       {children}
