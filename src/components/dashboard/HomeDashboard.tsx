@@ -9,8 +9,7 @@ import {
   Users, AlertTriangle, Plus, ArrowRight,
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, BookOpen, Handshake,
-  HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert,
-  HardDrive, Send, Zap, ChevronDown, AtSign, TrendingUp,
+  HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert, TrendingUp,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
