@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import type { SignedClient } from '@/app/utils/supabaseSync';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,6 +14,9 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
+import type { StepStatus, MissionType } from '@/app/context/OnboardingContext';
+import { TOTAL_STEPS } from '@/app/context/OnboardingContext';
+import type { DossierData } from '@/app/utils/localStorage';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -64,7 +68,7 @@ const TODAY = new Date().toLocaleDateString('fr-FR', {
 
 export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, sentQuotesMrr = 0, sentQuotesCount = 0, onNewProspect }: HomeDashboardProps) {
   const navigate = useNavigate();
-  const { dossiers, createDossier, loading } = useDossiersContext();
+  const { dossiers, createDossier, saveDossier, loading } = useDossiersContext();
   const [creatingDossier, setCreatingDossier] = useState(false);
   const { fiscalTasks } = useDashboardStore();
   const {
@@ -172,11 +176,27 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
     });
   }, [dossiers]);
 
+  /** Build the initial dossier payload with the correct missionType and step statuses. */
+  function buildNewDossier(dossier: DossierData, missionType: MissionType): DossierData {
+    const statuses = Array(TOTAL_STEPS).fill('pending') as StepStatus[];
+    statuses[0] = 'active';
+    return {
+      ...dossier,
+      clientData: { ...dossier.clientData, missionType },
+      stepStatuses: statuses,
+      currentStep: 1,
+    };
+  }
+
   const handleNewReprise = async () => {
     setCreatingDossier(true);
     try {
       const dossier = await createDossier();
-      navigate(`/onboarding/${dossier.id}?mission=reprise`);
+      await saveDossier(buildNewDossier(dossier, 'reprise'));
+      navigate(`/onboarding/${dossier.id}`);
+    } catch (err) {
+      console.error('[HomeDashboard] Failed to create dossier:', err);
+      toast.error('Erreur lors de la création du dossier');
     } finally {
       setCreatingDossier(false);
     }
@@ -186,7 +206,11 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
     setCreatingDossier(true);
     try {
       const dossier = await createDossier();
-      navigate(`/onboarding/${dossier.id}?mission=creation`);
+      await saveDossier(buildNewDossier(dossier, 'creation'));
+      navigate(`/onboarding/${dossier.id}`);
+    } catch (err) {
+      console.error('[HomeDashboard] Failed to create dossier:', err);
+      toast.error('Erreur lors de la création du dossier');
     } finally {
       setCreatingDossier(false);
     }
