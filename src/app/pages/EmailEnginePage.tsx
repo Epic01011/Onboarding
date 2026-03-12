@@ -122,9 +122,14 @@ export function EmailEnginePage() {
     setLoading(true);
     try {
       const result = await getSentEmails();
-      if (result.success) setEmails(result.emails);
+      if (result.success) {
+        setEmails(result.emails);
+      } else {
+        toast.error('Impossible de charger les emails');
+      }
     } catch (err) {
       console.error('Error loading emails:', err);
+      toast.error('Impossible de charger les emails');
     } finally {
       setLoading(false);
     }

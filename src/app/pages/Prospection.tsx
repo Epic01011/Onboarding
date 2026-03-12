@@ -394,7 +394,7 @@ export function Prospection() {
         setQuotesMap(prev => ({ ...prev, [sheetId]: result.quotes }));
       }
       setQuotesLoading(false);
-    });
+    }).catch(() => setQuotesLoading(false));
   }, [sheetId, storeProspects, quotesMap]);
 
   // ── Sync store.prospects → local leads (initial load only) ───────────────

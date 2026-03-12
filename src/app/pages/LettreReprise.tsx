@@ -134,6 +134,11 @@ export function LettreReprise() {
         setRawTemplate(content);
       }
       setTemplateLoading(false);
+    }).catch(() => {
+      if (!cancelled) {
+        setTemplateNotFound(true);
+        setTemplateLoading(false);
+      }
     });
     return () => { cancelled = true; };
   }, []);

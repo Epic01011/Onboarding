@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import {
   Calculator, ArrowLeft, Building2, BookOpen, Users, Settings2,
   CheckCircle2, Loader2, FileText, Euro, ChevronRight, Info,
-  Tag, Mail, Download, Printer, X, Trash2, RefreshCw, Scale, Eye, Search,
+  Tag, Mail, Download, Printer, X, Trash2, RefreshCw, Scale, Search,
   Receipt, Briefcase, Smartphone, UserCircle,
 } from 'lucide-react';
 import { usePricingStore } from '../store/usePricingStore';
@@ -2310,82 +2310,88 @@ export function PricingEngine() {
     setGenerating(true);
 
     setTimeout(async () => {
-      const result = calculateQuote(companyProfile, accounting, social, options);
-      const totalSetup = result.setupFees + result.socialSetupFees;
-      const newQuote: SavedQuote = {
-        id: crypto.randomUUID(),
-        status: 'DRAFT',
-        clientName: effectiveName,
-        siren: companyProfile.siren || undefined,
-        contactEmail: companyProfile.clientEmail || undefined,
-        raisonSociale: companyProfile.raisonSociale || undefined,
-        adresse: companyProfile.adresse || undefined,
-        codePostal: companyProfile.codePostal || undefined,
-        ville: companyProfile.ville || undefined,
-        activity: companyProfile.activity || undefined,
-        legalForm: companyProfile.legalForm,
-        revenueRange: companyProfile.revenueRange,
-        taxRegime: companyProfile.taxRegime,
-        digitalization: accounting.digitalization,
-        bulletinsPerMonth: social.bulletinsPerMonth,
-        multiEtablissement: social.multiEtablissement,
-        bilanCompris: accounting.bilanCompris,
-        rdvAtterrissage: accounting.rdvAtterrissage,
-        options: { ...options },
-        salesInvoices: accounting.salesInvoices,
-        purchaseInvoices: accounting.purchaseInvoices,
-        monthlyAccountingPrice: result.monthlyAccountingPrice,
-        monthlyClosurePrice: result.monthlyClosurePrice,
-        monthlySocialPrice: result.monthlySocialPrice,
-        monthlyOptionsPrice: result.monthlyOptionsPrice,
-        setupFees: totalSetup,
-        totalMonthlyHT: result.totalMonthlyHT,
-        createdAt: new Date().toISOString(),
-      };
-      saveQuote(newQuote);
-      setLatestQuote(newQuote);
-
-      // Persist to Supabase: create/update prospect + create DRAFT quote.
-      // This does NOT insert into the `clients` table — client insertion only
-      // happens when the user clicks "Valider pour Lettre de Mission".
-      const contactName = [companyProfile.prenomContact, companyProfile.nomContact].filter(Boolean).join(' ') || undefined;
-      const saveResult = await saveProspectAndQuote(
-        {
-          companyName: companyProfile.raisonSociale || effectiveName,
-          siren: companyProfile.siren || null,
-          address: companyProfile.adresse || null,
-          city: companyProfile.ville || null,
-          postalCode: companyProfile.codePostal || null,
-          contactName: contactName || null,
-          contactEmail: companyProfile.clientEmail || null,
-          secteurActivite: companyProfile.activity || null,
-          legalForm: companyProfile.legalForm || null,
-        },
-        {
+      try {
+        const result = calculateQuote(companyProfile, accounting, social, options);
+        const totalSetup = result.setupFees + result.socialSetupFees;
+        const newQuote: SavedQuote = {
+          id: crypto.randomUUID(),
           status: 'DRAFT',
-          monthlyTotal: newQuote.totalMonthlyHT,
-          setupFees: newQuote.setupFees,
-          quoteData: newQuote as unknown as Record<string, unknown>,
+          clientName: effectiveName,
+          siren: companyProfile.siren || undefined,
+          contactEmail: companyProfile.clientEmail || undefined,
+          raisonSociale: companyProfile.raisonSociale || undefined,
+          adresse: companyProfile.adresse || undefined,
+          codePostal: companyProfile.codePostal || undefined,
+          ville: companyProfile.ville || undefined,
+          activity: companyProfile.activity || undefined,
+          legalForm: companyProfile.legalForm,
+          revenueRange: companyProfile.revenueRange,
+          taxRegime: companyProfile.taxRegime,
+          digitalization: accounting.digitalization,
+          bulletinsPerMonth: social.bulletinsPerMonth,
+          multiEtablissement: social.multiEtablissement,
+          bilanCompris: accounting.bilanCompris,
+          rdvAtterrissage: accounting.rdvAtterrissage,
+          options: { ...options },
+          salesInvoices: accounting.salesInvoices,
+          purchaseInvoices: accounting.purchaseInvoices,
+          monthlyAccountingPrice: result.monthlyAccountingPrice,
+          monthlyClosurePrice: result.monthlyClosurePrice,
+          monthlySocialPrice: result.monthlySocialPrice,
+          monthlyOptionsPrice: result.monthlyOptionsPrice,
+          setupFees: totalSetup,
+          totalMonthlyHT: result.totalMonthlyHT,
+          createdAt: new Date().toISOString(),
+        };
+        saveQuote(newQuote);
+        setLatestQuote(newQuote);
+
+        // Persist to Supabase: create/update prospect + create DRAFT quote.
+        // This does NOT insert into the `clients` table — client insertion only
+        // happens when the user clicks "Valider pour Lettre de Mission".
+        const contactName = [companyProfile.prenomContact, companyProfile.nomContact].filter(Boolean).join(' ') || undefined;
+        const saveResult = await saveProspectAndQuote(
+          {
+            companyName: companyProfile.raisonSociale || effectiveName,
+            siren: companyProfile.siren || null,
+            address: companyProfile.adresse || null,
+            city: companyProfile.ville || null,
+            postalCode: companyProfile.codePostal || null,
+            contactName: contactName || null,
+            contactEmail: companyProfile.clientEmail || null,
+            secteurActivite: companyProfile.activity || null,
+            legalForm: companyProfile.legalForm || null,
+          },
+          {
+            status: 'DRAFT',
+            monthlyTotal: newQuote.totalMonthlyHT,
+            setupFees: newQuote.setupFees,
+            quoteData: newQuote as unknown as Record<string, unknown>,
+          }
+        );
+
+        if (saveResult.success) {
+          updateQuoteStatusStore(newQuote.id, 'DRAFT', saveResult.quoteId);
+          // Sync the local latestQuote state with the supabaseId returned by
+          // Supabase, so that handleValidate can read it without hitting the
+          // "Identifiant Supabase manquant" guard.
+          setLatestQuote(q => q ? { ...q, supabaseId: saveResult.quoteId, status: 'DRAFT' } : q);
+          toast.success(`Proposition créée pour ${effectiveName} ✓`);
+          resetPricingForm();
+        } else {
+          toast.error(`Erreur de sauvegarde : ${saveResult.error}`);
         }
-      );
 
-      if (saveResult.success) {
-        updateQuoteStatusStore(newQuote.id, 'DRAFT', saveResult.quoteId);
-        // Sync the local latestQuote state with the supabaseId returned by
-        // Supabase, so that handleValidate can read it without hitting the
-        // "Identifiant Supabase manquant" guard.
-        setLatestQuote(q => q ? { ...q, supabaseId: saveResult.quoteId, status: 'DRAFT' } : q);
-        toast.success(`Proposition créée pour ${effectiveName} ✓`);
-        resetPricingForm();
-      } else {
-        toast.error(`Erreur de sauvegarde : ${saveResult.error}`);
+        const allQuotes = [...savedQuotes, newQuote];
+        const html = buildHtmlForQuotes(allQuotes);
+        setPreviewHtml(html);
+        setPreviewOpen(true);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Erreur inconnue';
+        toast.error(`Erreur lors de la génération : ${message}`);
+      } finally {
+        setGenerating(false);
       }
-
-      const allQuotes = [...savedQuotes, newQuote];
-      const html = buildHtmlForQuotes(allQuotes);
-      setPreviewHtml(html);
-      setPreviewOpen(true);
-      setGenerating(false);
     }, 800);
   };
 

@@ -179,7 +179,7 @@ function OnboardingContent({ dossierId }: { dossierId: string }) {
           prospectId: result.id,
         });
       }
-    });
+    }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientData.nom, clientData.email, isLoaded]);
 
