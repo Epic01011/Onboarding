@@ -174,6 +174,10 @@ interface DashboardStore {
   syncingBalanceSheets: boolean;
   /** ISO timestamp of last successful Pennylane sync */
   lastBalanceSheetSync: string | null;
+  /** Error message from last balance sheet sync attempt, or null */
+  balanceSheetsError: string | null;
+  /** Async load status for balance sheets */
+  balanceSheetsLoadStatus: 'idle' | 'loading' | 'success' | 'error';
 
   loadingClients: boolean;
   loadingFiscalTasks: boolean;
@@ -239,6 +243,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   balanceSheets: [],
   syncingBalanceSheets: false,
   lastBalanceSheetSync: null,
+  balanceSheetsError: null,
+  balanceSheetsLoadStatus: 'idle',
   loadingClients: false,
   loadingFiscalTasks: false,
   loadingEmailDrafts: false,
@@ -458,12 +464,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   // ── Balance Sheets (Suivi des Bilans — Pennylane + Supabase) ─────────────────
 
   syncBalanceSheetData: async () => {
-    set({ syncingBalanceSheets: true });
+    set({ syncingBalanceSheets: true, balanceSheetsError: null, balanceSheetsLoadStatus: 'loading' });
 
     // Get current authenticated user for Supabase writes
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      set({ syncingBalanceSheets: false });
+      set({ syncingBalanceSheets: false, balanceSheetsLoadStatus: 'error', balanceSheetsError: 'Non authentifié' });
       toast.error('Vous devez être connecté pour synchroniser les bilans.');
       return;
     }
@@ -472,8 +478,9 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     const result = await fetchAccountingYears();
 
     if (!result.success || !result.data) {
-      set({ syncingBalanceSheets: false });
-      toast.error(`Pennylane : ${result.error ?? 'Impossible de récupérer les exercices comptables.'}`);
+      const errorMsg = result.error ?? 'Impossible de récupérer les exercices comptables.';
+      set({ syncingBalanceSheets: false, balanceSheetsLoadStatus: 'error', balanceSheetsError: errorMsg });
+      toast.error(`Pennylane : ${errorMsg}`);
       return;
     }
 
@@ -525,9 +532,16 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         balanceSheets: fetchResult.data,
         syncingBalanceSheets: false,
         lastBalanceSheetSync: now,
+        balanceSheetsLoadStatus: syncErrors.length > 0 ? 'error' : 'success',
+        balanceSheetsError: syncErrors.length > 0 ? `${syncErrors.length} erreur(s) de sync` : null,
       });
     } else {
-      set({ syncingBalanceSheets: false, lastBalanceSheetSync: now });
+      set({
+        syncingBalanceSheets: false,
+        lastBalanceSheetSync: now,
+        balanceSheetsLoadStatus: 'error',
+        balanceSheetsError: fetchResult.error,
+      });
     }
 
     // 4. Notify result
@@ -544,12 +558,18 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   },
 
   loadBalanceSheetsFromSupabase: async () => {
+    set({ balanceSheetsLoadStatus: 'loading', balanceSheetsError: null });
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      set({ balanceSheetsLoadStatus: 'idle' });
+      return;
+    }
 
     const result = await getBalanceSheets(user.id);
     if (result.success) {
-      set({ balanceSheets: result.data });
+      set({ balanceSheets: result.data, balanceSheetsLoadStatus: 'success' });
+    } else {
+      set({ balanceSheetsLoadStatus: 'error', balanceSheetsError: result.error });
     }
   },
 

@@ -208,6 +208,176 @@ export interface PennylaneAccountingYear {
   status: 'open' | 'closed' | 'closing_in_progress';
 }
 
+/** A single mandatory fiscal deadline for a customer dossier. */
+export interface PennylaneFiscalDeadline {
+  /** Type of fiscal obligation */
+  type: 'liasse_fiscale' | 'tva_ca3' | 'tva_ca12' | 'is_solde' | 'other';
+  /** Human-readable label in French */
+  label: string;
+  /** ISO date — statutory deadline */
+  due_date: string;
+  /** True if already filed / télétransmis */
+  filed: boolean;
+}
+
+/** Accounting year enriched with computed fiscal deadlines. */
+export interface PennylaneAccountingYearWithDeadlines extends PennylaneAccountingYear {
+  /** Mandatory fiscal deadlines derived from the closing date */
+  fiscal_deadlines: PennylaneFiscalDeadline[];
+  /** Primary deadline used for urgency calculation (liasse fiscale) */
+  primary_due_date: string;
+}
+
+/**
+ * Calcule les deadlines fiscales obligatoires à partir d'une date de clôture.
+ * Règles françaises approximatives :
+ *   - Liasse fiscale : clôture + 3 mois (IS)
+ *   - TVA CA12 annuelle : clôture + 3 mois
+ *   - IS Solde : clôture + 3 mois + 15 jours
+ *
+ * Note : pour une clôture au 31/12, la date exacte peut être ajustée par la
+ * réglementation fiscale en vigueur (arrêté ministériel chaque année).
+ */
+function computeFiscalDeadlines(
+  closingDateIso: string,
+  status: PennylaneAccountingYear['status'],
+): PennylaneFiscalDeadline[] {
+  const closing = new Date(closingDateIso);
+  const deadlines: PennylaneFiscalDeadline[] = [];
+
+  // Liasse fiscale : clôture + 3 mois, au plus tôt le 2e jour ouvré de mai pour clôture 31/12
+  const liasseDate = new Date(closing);
+  liasseDate.setMonth(liasseDate.getMonth() + 3);
+  deadlines.push({
+    type: 'liasse_fiscale',
+    label: 'Liasse fiscale',
+    due_date: liasseDate.toISOString().split('T')[0],
+    filed: status === 'closed',
+  });
+
+  // TVA CA12 annuelle : clôture + 3 mois (même règle)
+  const tvaDate = new Date(closing);
+  tvaDate.setMonth(tvaDate.getMonth() + 3);
+  deadlines.push({
+    type: 'tva_ca12',
+    label: 'TVA CA12 annuelle',
+    due_date: tvaDate.toISOString().split('T')[0],
+    filed: status === 'closed',
+  });
+
+  // IS Solde : clôture + 3 mois + 15 jours
+  const isDate = new Date(closing);
+  isDate.setMonth(isDate.getMonth() + 3);
+  isDate.setDate(isDate.getDate() + 15);
+  deadlines.push({
+    type: 'is_solde',
+    label: 'IS Solde',
+    due_date: isDate.toISOString().split('T')[0],
+    filed: status === 'closed',
+  });
+
+  return deadlines;
+}
+
+/**
+ * Récupère les dates de clôture d'exercice et les deadlines fiscales obligatoires
+ * (liasse fiscale, TVA) pour chaque dossier client.
+ *
+ * En mode réel (avec clé API), appelle l'endpoint Pennylane accounting_years.
+ * En mode démo (sans clé API), retourne des données représentatives.
+ */
+export async function fetchFiscalDeadlines(): Promise<{
+  success: boolean;
+  data?: PennylaneAccountingYearWithDeadlines[];
+  error?: string;
+  demo?: boolean;
+}> {
+  await delay(800);
+
+  const apiKey = getPennylaneKey();
+
+  if (!apiKey) {
+    const now = new Date();
+    const demoYears: PennylaneAccountingYear[] = [
+      {
+        id: 'acc_001',
+        customer_id: 'cust_001',
+        customer_name: 'SARL Martin & Associés',
+        start_date: `${now.getFullYear() - 1}-01-01`,
+        closing_date: `${now.getFullYear() - 1}-12-31`,
+        status: 'closing_in_progress',
+      },
+      {
+        id: 'acc_002',
+        customer_id: 'cust_002',
+        customer_name: 'SAS Dupont Tech',
+        start_date: `${now.getFullYear() - 1}-07-01`,
+        closing_date: `${now.getFullYear()}-06-30`,
+        status: 'open',
+      },
+      {
+        id: 'acc_003',
+        customer_id: 'cust_003',
+        customer_name: 'EURL Bernard Conseil',
+        start_date: `${now.getFullYear() - 1}-01-01`,
+        closing_date: `${now.getFullYear() - 1}-12-31`,
+        status: 'closed',
+      },
+    ];
+
+    const data: PennylaneAccountingYearWithDeadlines[] = demoYears.map(year => {
+      const fiscal_deadlines = computeFiscalDeadlines(year.closing_date, year.status);
+      const primary = fiscal_deadlines.find(d => d.type === 'liasse_fiscale');
+      return {
+        ...year,
+        fiscal_deadlines,
+        primary_due_date: primary?.due_date ?? fiscal_deadlines[0].due_date,
+      };
+    });
+
+    console.log('[PENNYLANE DEMO] fetchFiscalDeadlines — returning demo data');
+    return { success: true, demo: true, data };
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/accounting_years`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (err as { error?: string; message?: string }).error
+          ?? (err as { message?: string }).message
+          ?? `Erreur Pennylane (${res.status})`,
+      };
+    }
+
+    const json = await res.json() as { accounting_years?: PennylaneAccountingYear[] };
+    const years: PennylaneAccountingYear[] = json.accounting_years ?? [];
+
+    const data: PennylaneAccountingYearWithDeadlines[] = years.map(year => {
+      const fiscal_deadlines = computeFiscalDeadlines(year.closing_date, year.status);
+      const primary = fiscal_deadlines.find(d => d.type === 'liasse_fiscale');
+      return {
+        ...year,
+        fiscal_deadlines,
+        primary_due_date: primary?.due_date ?? fiscal_deadlines[0].due_date,
+      };
+    });
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('[PENNYLANE ERROR] fetchFiscalDeadlines', err);
+    return { success: false, error: 'Erreur de connexion à Pennylane' };
+  }
+}
+
 /**
  * Récupère les exercices comptables depuis Pennylane
  * pour alimenter le module Suivi des Bilans.

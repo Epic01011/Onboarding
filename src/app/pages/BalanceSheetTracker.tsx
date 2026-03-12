@@ -4,13 +4,15 @@
  * Module de production pour la période fiscale du cabinet.
  * Récupère les exercices comptables depuis Pennylane via syncBalanceSheetData(),
  * les persiste dans Supabase (balance_sheets), et affiche :
- *   - Tableau de bord de production avec barres de progression
+ *   - Tableau de bord de production avec barres de progression (vue liste)
+ *   - Vue Kanban par étape d'avancement
  *   - Alertes deadline J-30 / J-15
  *   - Filtres par collaborateur et mois de clôture
  *   - Bouton "Actualiser Pennylane" pour sync manuelle
+ *   - Deadlines fiscales : liasse fiscale, TVA
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   RefreshCw,
@@ -23,6 +25,8 @@ import {
   ChevronDown,
   FileText,
   TrendingUp,
+  LayoutList,
+  Columns,
 } from 'lucide-react';
 import { useDashboardStore } from '../store/useDashboardStore';
 import { Badge } from '../components/ui/badge';
@@ -39,6 +43,11 @@ import type { ProductionStep } from '../types/dashboard';
 
 // ─── Production step config ───────────────────────────────────────────────────
 
+/**
+ * Ordered list of production steps — maps directly to the 4-step French workflow:
+ *   Saisie → Révision → RDV Bilan → Télétransmis
+ * `not_started` is retained for compatibility with existing Supabase data.
+ */
 const PRODUCTION_STEPS: ProductionStep[] = [
   'not_started',
   'data_collection',
@@ -49,10 +58,10 @@ const PRODUCTION_STEPS: ProductionStep[] = [
 
 const STEP_LABELS: Record<ProductionStep, string> = {
   not_started:    'Non démarré',
-  data_collection: 'Collecte données',
+  data_collection: 'Saisie',
   revision:       'Révision',
-  final_review:   'Revue finale',
-  certified:      'Certifié',
+  final_review:   'RDV Bilan',
+  certified:      'Télétransmis',
 };
 
 const STEP_PROGRESS: Record<ProductionStep, number> = {
@@ -97,12 +106,16 @@ function urgencyBg(urgency: string): string {
   return 'bg-white border-gray-200';
 }
 
+/**
+ * Returns badge styling for the days-remaining indicator.
+ * Thresholds: Rouge < 15 jours · Orange < 30 jours · Vert ≥ 30 jours
+ */
 function urgencyBadge(days: number): { label: string; className: string } {
   if (days < 0)  return { label: `Dépassé de ${Math.abs(days)}j`, className: 'bg-red-100 text-red-800' };
   if (days === 0) return { label: "Aujourd'hui", className: 'bg-red-100 text-red-800' };
-  if (days <= 15) return { label: `J-${days}`, className: 'bg-red-100 text-red-800' };
-  if (days <= 30) return { label: `J-${days}`, className: 'bg-amber-100 text-amber-700' };
-  return { label: `J-${days}`, className: 'bg-gray-100 text-gray-600' };
+  if (days < 15) return { label: `J-${days}`, className: 'bg-red-100 text-red-800' };
+  if (days < 30) return { label: `J-${days}`, className: 'bg-amber-100 text-amber-700' };
+  return { label: `J-${days}`, className: 'bg-emerald-100 text-emerald-700' };
 }
 
 function formatDate(iso: string): string {
@@ -121,7 +134,7 @@ function AlertBanner({ sheets }: { sheets: BalanceSheetRecord[] }) {
   const critical = sheets.filter(s => {
     if (s.productionStep === 'certified') return false;
     const d = daysUntil(s.dueDate);
-    return d <= 30;
+    return d < 30;
   }).sort((a, b) => daysUntil(a.dueDate) - daysUntil(b.dueDate));
 
   if (critical.length === 0) return null;
@@ -144,7 +157,7 @@ function AlertBanner({ sheets }: { sheets: BalanceSheetRecord[] }) {
                     {badge.label}
                   </span>
                   <span className="font-medium">{s.customerName}</span>
-                  <span className="text-amber-600">— dépôt avant le {formatDate(s.dueDate)}</span>
+                  <span className="text-amber-600">— liasse fiscale avant le {formatDate(s.dueDate)}</span>
                   {s.assignedManager && (
                     <span className="text-amber-500">· {s.assignedManager}</span>
                   )}
@@ -178,12 +191,12 @@ function BalanceSheetRow({ sheet, onUpdateStep, onUpdateManager }: RowProps) {
   const badge = urgencyBadge(days);
   const progress = STEP_PROGRESS[sheet.productionStep];
 
-  const handleManagerBlur = () => {
+  const handleManagerBlur = useCallback(() => {
     setEditingManager(false);
     if (managerInput !== (sheet.assignedManager ?? '')) {
       onUpdateManager(sheet.pennylaneId, managerInput);
     }
-  };
+  }, [managerInput, sheet.assignedManager, sheet.pennylaneId, onUpdateManager]);
 
   return (
     <div className={`border rounded-xl p-4 transition-all ${urgencyBg(sheet.urgencySemantic)}`}>
@@ -203,7 +216,7 @@ function BalanceSheetRow({ sheet, onUpdateStep, onUpdateManager }: RowProps) {
             </span>
             <span className="flex items-center gap-1">
               <FileText className="w-3 h-3" />
-              Dépôt légal : {formatDate(sheet.dueDate)}
+              Liasse fiscale : {formatDate(sheet.dueDate)}
             </span>
           </div>
         </div>
@@ -283,11 +296,90 @@ function BalanceSheetRow({ sheet, onUpdateStep, onUpdateManager }: RowProps) {
           )}
         </div>
 
-        {/* Certified indicator */}
+        {/* Télétransmis indicator */}
         {sheet.productionStep === 'certified' && (
           <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Certifié
+            <CheckCircle2 className="w-3.5 h-3.5" /> Télétransmis
           </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Kanban Card component ────────────────────────────────────────────────────
+
+interface KanbanCardProps {
+  sheet: BalanceSheetRecord;
+  onUpdateStep: (pennylaneId: string, step: ProductionStep) => void;
+}
+
+function KanbanCard({ sheet, onUpdateStep }: KanbanCardProps) {
+  const days = daysUntil(sheet.dueDate);
+  const badge = urgencyBadge(days);
+
+  return (
+    <div className={`border rounded-lg p-3 text-sm shadow-sm transition-all ${urgencyBg(sheet.urgencySemantic)}`}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="font-semibold text-gray-900 leading-tight text-sm truncate flex-1">
+          {sheet.customerName}
+        </p>
+        <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${badge.className}`}>
+          {badge.label}
+        </span>
+      </div>
+      <div className="space-y-1 text-xs text-gray-500">
+        <div className="flex items-center gap-1">
+          <Calendar className="w-3 h-3 flex-shrink-0" />
+          <span>Clôture : {formatDate(sheet.closingDate)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <FileText className="w-3 h-3 flex-shrink-0" />
+          <span>Liasse : {formatDate(sheet.dueDate)}</span>
+        </div>
+        {sheet.assignedManager && (
+          <div className="flex items-center gap-1">
+            <User className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{sheet.assignedManager}</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex gap-1 flex-wrap">
+        {PRODUCTION_STEPS.filter(s => s !== sheet.productionStep).map(step => (
+          <button
+            key={step}
+            onClick={() => onUpdateStep(sheet.pennylaneId, step)}
+            className={`text-xs px-2 py-1 rounded border border-gray-200 hover:border-gray-400 transition-colors ${STEP_COLOR[step]}`}
+          >
+            → {STEP_LABELS[step]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Kanban Column component ──────────────────────────────────────────────────
+
+interface KanbanColumnProps {
+  step: ProductionStep;
+  sheets: BalanceSheetRecord[];
+  onUpdateStep: (pennylaneId: string, step: ProductionStep) => void;
+}
+
+function KanbanColumn({ step, sheets, onUpdateStep }: KanbanColumnProps) {
+  return (
+    <div className="flex-1 min-w-[200px]">
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg ${STEP_COLOR[step]}`}>
+        <span className="text-xs font-semibold">{STEP_LABELS[step]}</span>
+        <span className="ml-auto text-xs font-medium opacity-75">{sheets.length}</span>
+      </div>
+      <div className="bg-gray-100 rounded-b-lg p-2 space-y-2 min-h-[100px]">
+        {sheets.map(sheet => (
+          <KanbanCard key={sheet.pennylaneId} sheet={sheet} onUpdateStep={onUpdateStep} />
+        ))}
+        {sheets.length === 0 && (
+          <p className="text-xs text-gray-400 text-center pt-4 italic">Aucun dossier</p>
         )}
       </div>
     </div>
@@ -302,6 +394,7 @@ export function BalanceSheetTracker() {
     balanceSheets,
     syncingBalanceSheets,
     lastBalanceSheetSync,
+    balanceSheetsError,
     syncBalanceSheetData,
     loadBalanceSheetsFromSupabase,
     updateBalanceSheet,
@@ -310,6 +403,7 @@ export function BalanceSheetTracker() {
 
   const [filterManager, setFilterManager] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   // Load from Supabase on mount. If store is still empty after the DB load
   // (first visit or empty DB), trigger a Pennylane sync.
@@ -350,6 +444,19 @@ export function BalanceSheetTracker() {
     });
   }, [planning, filterManager, filterMonth]);
 
+  // Kanban groups — one column per production step
+  const kanbanGroups = useMemo(() => {
+    const groups: Record<ProductionStep, BalanceSheetRecord[]> = {
+      not_started: [],
+      data_collection: [],
+      revision: [],
+      final_review: [],
+      certified: [],
+    };
+    filtered.forEach(s => groups[s.productionStep].push(s));
+    return groups;
+  }, [filtered]);
+
   // KPI stats
   const stats = useMemo(() => {
     const total = balanceSheets.length;
@@ -363,13 +470,18 @@ export function BalanceSheetTracker() {
     return { total, certified, inProgress, overdue };
   }, [balanceSheets]);
 
-  const handleUpdateStep = (pennylaneId: string, step: ProductionStep) => {
+  const handleUpdateStep = useCallback((pennylaneId: string, step: ProductionStep) => {
     updateBalanceSheet(pennylaneId, { productionStep: step });
-  };
+  }, [updateBalanceSheet]);
 
-  const handleUpdateManager = (pennylaneId: string, manager: string) => {
+  const handleUpdateManager = useCallback((pennylaneId: string, manager: string) => {
     updateBalanceSheet(pennylaneId, { assignedManager: manager });
-  };
+  }, [updateBalanceSheet]);
+
+  const handleResetFilters = useCallback(() => {
+    setFilterManager('all');
+    setFilterMonth('all');
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -401,21 +513,62 @@ export function BalanceSheetTracker() {
               </div>
             </div>
 
-            {/* Manual sync button */}
-            <button
-              onClick={() => syncBalanceSheetData()}
-              disabled={syncingBalanceSheets}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
-              title="Synchroniser avec Pennylane"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncingBalanceSheets ? 'animate-spin' : ''}`} />
-              {syncingBalanceSheets ? 'Actualisation…' : 'Actualiser Pennylane'}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-2 text-xs flex items-center gap-1.5 transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                  title="Vue liste"
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  Liste
+                </button>
+                <button
+                  onClick={() => setViewMode('kanban')}
+                  className={`px-3 py-2 text-xs flex items-center gap-1.5 transition-colors ${
+                    viewMode === 'kanban'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                  title="Vue Kanban"
+                >
+                  <Columns className="w-3.5 h-3.5" />
+                  Kanban
+                </button>
+              </div>
+
+              {/* Manual sync button */}
+              <button
+                onClick={() => syncBalanceSheetData()}
+                disabled={syncingBalanceSheets}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                title="Synchroniser avec Pennylane"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncingBalanceSheets ? 'animate-spin' : ''}`} />
+                {syncingBalanceSheets ? 'Actualisation…' : 'Actualiser Pennylane'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Error banner */}
+        {balanceSheetsError && !syncingBalanceSheets && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-900">Erreur de synchronisation</p>
+              <p className="text-xs text-red-700 mt-0.5">{balanceSheetsError}</p>
+            </div>
+          </div>
+        )}
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -425,7 +578,7 @@ export function BalanceSheetTracker() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <p className="text-xs text-gray-500">Certifiés</p>
+              <p className="text-xs text-gray-500">Télétransmis</p>
             </div>
             <p className="text-3xl font-bold text-emerald-600">{stats.certified}</p>
             {stats.total > 0 && (
@@ -458,7 +611,7 @@ export function BalanceSheetTracker() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-gray-700">Avancement Période Fiscale</p>
               <span className="text-sm font-semibold text-gray-900">
-                {stats.certified} / {stats.total} bilans certifiés
+                {stats.certified} / {stats.total} bilans télétransmis
               </span>
             </div>
             <Progress value={stats.total > 0 ? Math.round((stats.certified / stats.total) * 100) : 0} className="h-3" />
@@ -501,7 +654,7 @@ export function BalanceSheetTracker() {
 
           {(filterManager !== 'all' || filterMonth !== 'all') && (
             <button
-              onClick={() => { setFilterManager('all'); setFilterMonth('all'); }}
+              onClick={handleResetFilters}
               className="text-xs text-gray-500 hover:text-gray-700 underline"
             >
               Réinitialiser
@@ -513,7 +666,7 @@ export function BalanceSheetTracker() {
           </span>
         </div>
 
-        {/* Balance sheet list */}
+        {/* Content */}
         {syncingBalanceSheets && balanceSheets.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <RefreshCw className="w-8 h-8 text-indigo-400 mx-auto mb-3 animate-spin" />
@@ -536,7 +689,20 @@ export function BalanceSheetTracker() {
               </button>
             )}
           </div>
+        ) : viewMode === 'kanban' ? (
+          /* ── Kanban view ── */
+          <div className="flex gap-3 overflow-x-auto pb-4">
+            {PRODUCTION_STEPS.map(step => (
+              <KanbanColumn
+                key={step}
+                step={step}
+                sheets={kanbanGroups[step]}
+                onUpdateStep={handleUpdateStep}
+              />
+            ))}
+          </div>
         ) : (
+          /* ── List view ── */
           <div className="space-y-3">
             {filtered.map(sheet => (
               <BalanceSheetRow
