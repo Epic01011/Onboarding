@@ -4,7 +4,7 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import type { FormeJuridiqueCreation } from '../../context/OnboardingContext';
 import { StepShell } from '../StepShell';
 import { fetchBySIREN } from '../../services/sirenApi';
-import { validateSIREN } from '../../utils/validators';
+import { validateSIREN, validateEmail } from '../../utils/validators';
 import { toast } from 'sonner';
 
 export function Step1() {
@@ -105,7 +105,7 @@ export function Step1() {
     }
 
     if (!clientData.nom.trim()) e.nom = 'Le nom du contact est requis';
-    if (!clientData.email || !/\S+@\S+\.\S+/.test(clientData.email)) {
+    if (!clientData.email || !validateEmail(clientData.email)) {
       e.email = 'Une adresse email valide est requise';
     }
     if (!clientData.telephone || !/^(\+33|0)\d{9}$/.test(clientData.telephone.replace(/\s/g, ''))) {
@@ -116,7 +116,7 @@ export function Step1() {
       e.confrereEmail = "L'email du confrère est requis pour une reprise";
     }
     if (clientData.missionType === 'reprise' && clientData.confrereEmail &&
-        !/\S+@\S+\.\S+/.test(clientData.confrereEmail)) {
+        !validateEmail(clientData.confrereEmail)) {
       e.confrereEmail = 'Email du confrère invalide';
     }
     if (clientData.missionType === 'creation') {

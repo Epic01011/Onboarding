@@ -9,6 +9,7 @@
 // Imported for use in resolveLibelleNAF and re-exported so any existing
 // callers that import NAF_MAPPING from this file continue to work.
 import { NAF_MAPPING } from '../utils/nafMapping';
+import { fetchWithTimeout } from '../utils/corsProxies';
 export { NAF_MAPPING };
 
 export interface SirenData {
@@ -192,31 +193,6 @@ export async function fetchBySIREN(siren: string): Promise<SirenResult> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-async function fetchWithTimeout(
-  url: string,
-  timeoutMs: number
-): Promise<Record<string, unknown> | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-
-    if (!json?.results?.length) return null; // SIREN inconnu
-    return json;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function parseApiResponse(
   json: Record<string, unknown>,
   cleanSiren: string

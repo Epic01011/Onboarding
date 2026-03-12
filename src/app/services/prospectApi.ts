@@ -12,6 +12,8 @@
  *  - Le secteur d'activité dérivé du code NAF
  */
 
+import { CORS_PROXIES, fetchWithTimeout } from '../utils/corsProxies';
+
 // ─── Types exportés ───────────────────────────────────────────────────────────
 
 export interface ProspectFilters {
@@ -77,12 +79,6 @@ export type ProspectSearchResult =
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const API_BASE = 'https://recherche-entreprises.api.gouv.fr';
-
-const CORS_PROXIES: Array<(url: string) => string> = [
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://cors.sh/${url}`,
-];
 
 /**
  * Mapping secteur UI → lettre de section NACE
@@ -528,33 +524,6 @@ function makeDemo(
     email: '',
     telephone: '',
   };
-}
-
-// ─── Helpers réseau ───────────────────────────────────────────────────────────
-
-async function fetchWithTimeout(
-  url: string,
-  timeoutMs: number,
-): Promise<Record<string, unknown> | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    // allorigins enveloppe la réponse dans { contents: '...' }
-    const parsed =
-      typeof json?.contents === 'string' ? JSON.parse(json.contents) : json;
-    if (!Array.isArray(parsed?.results)) return null;
-    return parsed as Record<string, unknown>;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // ─── Helpers de transformation ────────────────────────────────────────────────

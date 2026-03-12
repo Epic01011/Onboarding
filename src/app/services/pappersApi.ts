@@ -10,6 +10,8 @@
  *  3. Retourne une erreur propre si tout échoue (le processus n'est pas bloqué)
  */
 
+import { CORS_PROXIES, fetchWithTimeout } from '../utils/corsProxies';
+
 export interface DirigeantItem {
   nom: string;
   prenom: string;
@@ -21,12 +23,6 @@ export type PappersResult =
   | { success: false; error: string };
 
 const API_BASE = 'https://recherche-entreprises.api.gouv.fr';
-
-const CORS_PROXIES = [
-  (url: string) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://cors.sh/${url}`,
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Point d'entrée principal
@@ -76,34 +72,6 @@ export async function fetchDirigeantsPappers(siren: string): Promise<PappersResu
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-async function fetchWithTimeout(
-  url: string,
-  timeoutMs: number
-): Promise<Record<string, unknown> | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-
-    // allorigins wraps the response in { contents: '...' }
-    const parsed = typeof json?.contents === 'string' ? JSON.parse(json.contents) : json;
-
-    if (!parsed?.results?.length) return null;
-    return parsed;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function parseDirigeants(json: Record<string, unknown>): DirigeantItem[] {
   const results = json.results as Record<string, unknown>[];
   const r = results[0] as Record<string, unknown>;
