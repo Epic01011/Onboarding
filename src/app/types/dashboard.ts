@@ -77,6 +77,8 @@ export interface ClientKYC extends PappersCompanyResponse {
   updated_at: string;
   /** ISO timestamp when the KYC form was submitted */
   submittedAt: string;
+  /** Pennylane customer ID — required for fiscal deadline and debt sync */
+  pennylane_company_id?: string;
 }
 
 // ─── Bidirectional Sync (Impôts.gouv / Pennylane) ───────────────────────────
@@ -279,4 +281,24 @@ export interface N8nJob {
   status: 'pending' | 'completed' | 'failed';
   result?: unknown;
   created_at: string;
+}
+
+// ─── Client (Dossier) — Zéro Robot fields ────────────────────────────────────
+
+/**
+ * Lightweight client record used by fiscal panels and API connectors.
+ * `siren` is the legal identifier; `pennylane_company_id` links the dossier
+ * to Pennylane for deadline and debt sync.
+ */
+export interface Client {
+  /** Internal unique ID */
+  id: string;
+  /** Raison sociale */
+  name: string;
+  /** SIREN (9 digits) — used by API Entreprise for tax certificates */
+  siren: string;
+  /** Pennylane customer ID — used for fiscal deadline and debt sync */
+  pennylane_company_id?: string;
+  /** Contact email */
+  email?: string;
 }

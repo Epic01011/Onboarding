@@ -49,7 +49,6 @@ import {
 } from '../components/ui/dropdown-menu';
 import { Button } from '../components/ui/button';
 import { useFiscalAlerts } from '../hooks/useFiscalAlerts';
-import { syncFiscalDeadlines } from '../services/dgfipApi';
 import type { FiscalTask } from '../types/dashboard';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
@@ -340,15 +339,11 @@ export function HabilitationsFiscales() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [userHasSorted, setUserHasSorted] = useState(false);
 
-  // ── Initial load (simulate API call) ────────────────────────────────────────
+  // ── Initial load (use demo data — deadlines now come from Pennylane per dossier) ─
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       try {
-        const result = await syncFiscalDeadlines();
-        setSyncedAt(result.synced_at);
-        setFiscalTasks(result.tasks.length > 0 ? result.tasks : toFiscalTasks(DEMO_DOSSIERS));
-      } catch {
         setSyncedAt(new Date().toISOString());
         setFiscalTasks(toFiscalTasks(DEMO_DOSSIERS));
       } finally {
@@ -362,12 +357,10 @@ export function HabilitationsFiscales() {
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const result = await syncFiscalDeadlines();
-      setSyncedAt(result.synced_at);
-      if (result.tasks.length > 0) setFiscalTasks(result.tasks);
-      toast.success('Synchronisation DGFiP réussie', { description: formatSyncTime(result.synced_at) });
-    } catch {
-      toast.error('Erreur de synchronisation DGFiP');
+      const now = new Date().toISOString();
+      setSyncedAt(now);
+      setFiscalTasks(toFiscalTasks(DEMO_DOSSIERS));
+      toast.success('Données actualisées', { description: formatSyncTime(now) });
     } finally {
       setIsSyncing(false);
     }
