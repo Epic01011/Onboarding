@@ -475,9 +475,28 @@ export function Prospection() {
     filters.search.trim() !== '';
 
   // ── Selection helpers ─────────────────────────────────────────────────────
-  const selectedCount = filtered.filter(l => selected.has(l.siren)).length;
-  const allSelected   = filtered.length > 0 && filtered.every(l => selected.has(l.siren));
-  const someSelected  = filtered.some(l => selected.has(l.siren)) && !allSelected;
+  // Memoized to avoid O(n) re-computation on every render unrelated to
+  // filtered/selected changes. A single loop derives all three values at once;
+  // we must traverse the full list to get the accurate selectedCount, so no
+  // early exit is possible.
+  const { selectedCount, allSelected, someSelected } = useMemo(() => {
+    let count = 0;
+    let allSel = filtered.length > 0;
+    let anySel = false;
+    for (const l of filtered) {
+      if (selected.has(l.siren)) {
+        count++;
+        anySel = true;
+      } else {
+        allSel = false;
+      }
+    }
+    return {
+      selectedCount: count,
+      allSelected: allSel,
+      someSelected: anySel && !allSel,
+    };
+  }, [filtered, selected]);
 
   function toggleAll() {
     setSelected(prev => {
@@ -739,7 +758,10 @@ export function Prospection() {
   function deleteSearch(id: string)   { setSavedSearches(prev => prev.filter(s => s.id !== id)); }
 
   // ── Campaign — opens the modal ────────────────────────────────────────────
-  const selectedProspects = filtered.filter(l => selected.has(l.siren));
+  const selectedProspects = useMemo(
+    () => filtered.filter(l => selected.has(l.siren)),
+    [filtered, selected]
+  );
 
   function openCampaignModal() {
     if (selectedProspects.length > 0) setShowCampaignModal(true);
@@ -987,12 +1009,19 @@ export function Prospection() {
 
   // ── Computed analytics (Chantier 7) ───────────────────────────────────────
   const emailAnalytics = useMemo(() => {
-    const sentLeads    = leads.filter(l => l.emailSentAt);
-    const openedCount  = leads.filter(l => l.openCount > 0).length;
-    const clickedCount = leads.filter(l => l.clicked).length;
-    const rdvLeads     = leads.filter(l => l.statut === 'interesse');
-    const openRate     = sentLeads.length > 0 ? Math.round((openedCount / sentLeads.length) * 100) : 0;
-    const clickRate    = sentLeads.length > 0 ? Math.round((clickedCount / sentLeads.length) * 100) : 0;
+    // Single pass: collect all stats together instead of four separate filters.
+    const sentLeads: typeof leads = [];
+    const rdvLeads: typeof leads = [];
+    let openedCount = 0;
+    let clickedCount = 0;
+    for (const l of leads) {
+      if (l.emailSentAt) sentLeads.push(l);
+      if (l.openCount > 0) openedCount++;
+      if (l.clicked) clickedCount++;
+      if (l.statut === 'interesse') rdvLeads.push(l);
+    }
+    const openRate  = sentLeads.length > 0 ? Math.round((openedCount  / sentLeads.length) * 100) : 0;
+    const clickRate = sentLeads.length > 0 ? Math.round((clickedCount / sentLeads.length) * 100) : 0;
     return { sentLeads, rdvLeads, openRate, clickRate };
   }, [leads]);
   const { sentLeads, rdvLeads, openRate, clickRate } = emailAnalytics;

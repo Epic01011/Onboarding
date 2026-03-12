@@ -79,99 +79,123 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
 
   const kpis = useMemo(() => {
     const now = Date.now();
+    // Whether the fallback CA calculation from dossiers is needed at all.
+    const needCaFromDossiers = signedClients.length === 0;
 
-    const clientsActifs = dossiers.filter(d => {
-      const p = getDossierProgress(d);
-      return p > 0 && p < 1;
-    }).length;
-
-    const overdues = dossiers.filter(d => {
-      if (getDossierProgress(d) >= 1) return false;
-      return now - new Date(d.updatedAt).getTime() > OVERDUE_THRESHOLD_MS;
-    }).length;
-
-    const aiPending = dossiers.filter(d => {
-      if (d.clientData.missionType !== 'reprise') return false;
-      const s = d.stepStatuses[AI_ANALYSIS_STEP_INDEX];
-      return s === 'pending' || s === 'active';
-    }).length;
-
-    // CA Onboardé from signed LDMs (sum of monthly * 12 from backend)
-    const caOnboarde = signedClients.length > 0
-      ? signedClients.reduce((sum, client) => sum + (client.monthlyTotal * 12), 0)
-      : dossiers
-          .filter(d => d.clientData.lettreMissionSignee)
-          .reduce((sum, d) => sum + parsePrix(d.clientData.prixAnnuel), 0);
-
-    // Detailed blockers for in-progress dossiers
+    // Single pass over dossiers: compute progress once per dossier and
+    // accumulate all counters and blockers together to avoid redundant
+    // getDossierProgress() calls and multiple array iterations.
+    let clientsActifs = 0;
+    let overdues = 0;
+    let aiPending = 0;
+    let caFromDossiers = 0;
     const blockers: Blocker[] = [];
-    dossiers.forEach(d => {
+
+    for (const d of dossiers) {
       const cd = d.clientData;
       const p = getDossierProgress(d);
-      if (p >= 1) return;
+      const inProgress = p > 0 && p < 1;
 
-      if (cd.missionType === 'creation') {
-        if (!cd.carteIdentiteUploaded) {
+      if (inProgress) clientsActifs++;
+
+      if (p < 1 && now - new Date(d.updatedAt).getTime() > OVERDUE_THRESHOLD_MS) overdues++;
+
+      if (cd.missionType === 'reprise') {
+        const s = d.stepStatuses[AI_ANALYSIS_STEP_INDEX];
+        if (s === 'pending' || s === 'active') aiPending++;
+      }
+
+      if (needCaFromDossiers && cd.lettreMissionSignee) {
+        caFromDossiers += parsePrix(cd.prixAnnuel);
+      }
+
+      if (p < 1) {
+        if (cd.missionType === 'creation') {
+          if (!cd.carteIdentiteUploaded) {
+            blockers.push({
+              type: 'missing_doc',
+              message: `Carte d'identité manquante`,
+              dossierId: d.id,
+              clientNom: cd.nom || 'Client inconnu',
+            });
+          }
+          if (!cd.justificatifDomicileUploaded) {
+            blockers.push({
+              type: 'missing_doc',
+              message: `Justificatif de domicile manquant`,
+              dossierId: d.id,
+              clientNom: cd.nom || 'Client inconnu',
+            });
+          }
+        }
+
+        if (cd.lettreMissionSignatureId && !cd.lettreMissionSignee) {
           blockers.push({
-            type: 'missing_doc',
-            message: `Carte d'identité manquante`,
+            type: 'pending_signature',
+            message: `LDM en attente de signature`,
             dossierId: d.id,
-            clientNom: cd.nom || 'Client inconnu',
+            clientNom: cd.nom || cd.raisonSociale || 'Client inconnu',
           });
         }
-        if (!cd.justificatifDomicileUploaded) {
+
+        if (!cd.documentDemandeSent && p > 0.2) {
           blockers.push({
-            type: 'missing_doc',
-            message: `Justificatif de domicile manquant`,
+            type: 'action_required',
+            message: `Demande documentaire non envoyée`,
             dossierId: d.id,
-            clientNom: cd.nom || 'Client inconnu',
+            clientNom: cd.nom || cd.raisonSociale || 'Client inconnu',
           });
         }
       }
+    }
 
-      if (cd.lettreMissionSignatureId && !cd.lettreMissionSignee) {
-        blockers.push({
-          type: 'pending_signature',
-          message: `LDM en attente de signature`,
-          dossierId: d.id,
-          clientNom: cd.nom || cd.raisonSociale || 'Client inconnu',
-        });
-      }
-
-      if (!cd.documentDemandeSent && p > 0.2) {
-        blockers.push({
-          type: 'action_required',
-          message: `Demande documentaire non envoyée`,
-          dossierId: d.id,
-          clientNom: cd.nom || cd.raisonSociale || 'Client inconnu',
-        });
-      }
-    });
+    // CA Onboardé from signed LDMs (sum of monthly * 12 from backend)
+    const caOnboarde = needCaFromDossiers
+      ? caFromDossiers
+      : signedClients.reduce((sum, client) => sum + (client.monthlyTotal * 12), 0);
 
     return { clientsActifs, overdues, aiPending, caOnboarde, blockers };
   }, [dossiers, signedClients]);
 
   const chartData = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
-      const monthOffset = 5 - i;
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - monthOffset + 1, 0);
+    const nowYear = now.getFullYear();
+    const nowMonth = now.getMonth();
 
-      const monthDossiers = dossiers.filter(d => {
-        const created = new Date(d.createdAt);
-        return created >= monthStart && created <= monthEnd;
-      });
+    // Build a lookup for the 6 month slots (oldest → newest) using a
+    // composite key of "year-month" so we only iterate dossiers once.
+    type MonthBucket = { count: number; ca: number };
+    const buckets = new Map<string, MonthBucket>();
+    const slotKeys: string[] = [];
 
-      // CA: only count signed LDMs (lettreMissionSignee = true)
-      const ca = monthDossiers
-        .filter(d => d.clientData.lettreMissionSignee)
-        .reduce((sum, d) => sum + parsePrix(d.clientData.prixAnnuel) / MONTHS_PER_YEAR, 0);
+    for (let i = 0; i < 6; i++) {
+      const offset = 5 - i;
+      const d = new Date(nowYear, nowMonth - offset, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      slotKeys.push(key);
+      buckets.set(key, { count: 0, ca: 0 });
+    }
 
+    // Single pass: parse createdAt once per dossier and bucket it.
+    for (const d of dossiers) {
+      const created = new Date(d.createdAt);
+      const key = `${created.getFullYear()}-${created.getMonth()}`;
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+      bucket.count++;
+      if (d.clientData.lettreMissionSignee) {
+        bucket.ca += parsePrix(d.clientData.prixAnnuel) / MONTHS_PER_YEAR;
+      }
+    }
+
+    return slotKeys.map((key, i) => {
+      const offset = 5 - i;
+      const monthDate = new Date(nowYear, nowMonth - offset, 1);
+      const bucket = buckets.get(key)!;
       return {
-        mois: MONTHS_FR[monthStart.getMonth()],
-        ca: Math.round(ca),
-        dossiers: monthDossiers.length,
+        mois: MONTHS_FR[monthDate.getMonth()],
+        ca: Math.round(bucket.ca),
+        dossiers: bucket.count,
       };
     });
   }, [dossiers]);
@@ -270,8 +294,13 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
   // ── DGFIP Notifications widget ──────────────────────────────────────────────
 
   const dgfipNotifications = useMemo(() => {
-    const mismatchTasks = fiscalTasks.filter(t => t.mismatch_alert);
-    const certTasks = fiscalTasks.filter(t => t.is_dgfip_certified && t.status !== 'declared');
+    // Single pass: collect mismatch and certified tasks simultaneously.
+    const mismatchTasks: typeof fiscalTasks = [];
+    const certTasks: typeof fiscalTasks = [];
+    for (const t of fiscalTasks) {
+      if (t.mismatch_alert) mismatchTasks.push(t);
+      if (t.is_dgfip_certified && t.status !== 'declared') certTasks.push(t);
+    }
     if (mismatchTasks.length === 0 && certTasks.length === 0) return null;
 
     const items: DgfipNotificationItem[] = [
