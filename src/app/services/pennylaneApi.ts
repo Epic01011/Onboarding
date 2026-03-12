@@ -710,8 +710,9 @@ export async function getFiscalDebts(
   }
 
   try {
+    // Fetch all unpaid supplier invoices then filter client-side for DGFIP / Trésor Public
     const res = await fetch(
-      `${BASE_URL}/customers/${pennylaneCompanyId}/supplier_invoices?supplier=DGFIP&status=unpaid`,
+      `${BASE_URL}/customers/${pennylaneCompanyId}/supplier_invoices?status=unpaid`,
       {
         method: 'GET',
         headers: {
@@ -733,19 +734,26 @@ export async function getFiscalDebts(
       supplier_invoices?: Array<{
         id: string;
         label?: string;
+        supplier_name?: string;
         total_amount?: number;
         due_date?: string;
         status?: string;
       }>;
     };
 
-    const data: FiscalDebtEntry[] = (json.supplier_invoices ?? []).map(inv => ({
-      id: inv.id,
-      tax_type: inv.label ?? 'DGFIP',
-      amount: inv.total_amount ?? 0,
-      due_date: inv.due_date ?? new Date().toISOString().split('T')[0],
-      status: inv.status ?? 'unknown',
-    }));
+    const DGFIP_SUPPLIERS = ['dgfip', 'trésor public', 'tresor public', 'direction générale des finances publiques'];
+    const data: FiscalDebtEntry[] = (json.supplier_invoices ?? [])
+      .filter(inv => {
+        const name = (inv.supplier_name ?? inv.label ?? '').toLowerCase();
+        return DGFIP_SUPPLIERS.some(s => name.includes(s));
+      })
+      .map(inv => ({
+        id: inv.id,
+        tax_type: inv.label ?? 'DGFIP',
+        amount: inv.total_amount ?? 0,
+        due_date: inv.due_date ?? new Date().toISOString().split('T')[0],
+        status: inv.status ?? 'unknown',
+      }));
 
     return { success: true, data };
   } catch (err) {

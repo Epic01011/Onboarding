@@ -82,7 +82,7 @@ function AttestationBlock({ client }: { client: Client }) {
         <h3 className="text-sm font-semibold text-gray-800">Attestation Fiscale</h3>
       </div>
       <p className="text-xs text-gray-500">
-        Obtenu directement depuis l'API Entreprise de l'État (API Entreprise v4 / DGFIP).
+        Obtenue directement depuis l'API Entreprise de l'État (API Entreprise v4 / DGFIP).
         Le SIREN utilisé : <span className="font-mono font-medium text-gray-700">{client.siren || '—'}</span>
       </p>
       <Button
