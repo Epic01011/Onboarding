@@ -10,6 +10,7 @@ import {
   Calculator, Calendar, RefreshCw, Mail, FileText, CheckCircle, Bell,
   Radar, Cog, BookOpen, Handshake,
   HardDrive, Send, Zap, ChevronDown, AtSign, ShieldCheck, ShieldAlert, TrendingUp,
+  UserPlus,
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress } from '@/app/utils/dossierUtils';
@@ -53,13 +54,15 @@ interface HomeDashboardProps {
   sentQuotesMrr?: number;
   /** Number of quotes with status SENT. */
   sentQuotesCount?: number;
+  /** Callback to open the "Nouveau prospect" modal. */
+  onNewProspect?: () => void;
 }
 
 const TODAY = new Date().toLocaleDateString('fr-FR', {
   weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
 });
 
-export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, sentQuotesMrr = 0, sentQuotesCount = 0 }: HomeDashboardProps) {
+export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, sentQuotesMrr = 0, sentQuotesCount = 0, onNewProspect }: HomeDashboardProps) {
   const navigate = useNavigate();
   const { dossiers, createDossier, loading } = useDossiersContext();
   const [creatingDossier, setCreatingDossier] = useState(false);
@@ -318,14 +321,25 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
           </h1>
           <p className="text-sm text-muted-foreground mt-1 capitalize">{TODAY}</p>
         </div>
-        <button
-          onClick={() => navigate('/dossiers-actifs')}
-          disabled={creatingDossier}
-          className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-60 self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Nouveau dossier
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onNewProspect && (
+            <button
+              onClick={onNewProspect}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all duration-200"
+            >
+              <UserPlus className="w-4 h-4" />
+              Nouveau prospect
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/dossiers-actifs')}
+            disabled={creatingDossier}
+            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-60"
+          >
+            <Plus className="w-4 h-4" />
+            Nouveau dossier
+          </button>
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════ */}

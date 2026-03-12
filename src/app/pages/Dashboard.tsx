@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { HomeDashboard } from '@/components/dashboard/HomeDashboard';
 import { EmailEngine } from '@/components/dashboard/EmailEngine';
+import { NewProspectModal } from '@/components/crm/NewProspectModal';
 import {
   FolderOpen, Clock, CheckCircle2, Building2,
   Trash2, ArrowRight, Zap, AlertCircle,
@@ -28,6 +29,7 @@ export function Dashboard() {
   const { connections } = useServices();
   const [activeFilter, setActiveFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
   const [, setCreatingDossier] = useState(false);
+  const [showNewProspectModal, setShowNewProspectModal] = useState(false);
   const { balanceSheets, loadBalanceSheetsFromSupabase } = useDashboardStore();
 
   // ── Signed clients (propositions SIGNED) ────────────────────────────────
@@ -231,6 +233,7 @@ export function Dashboard() {
           validatedQuotesCount={validatedQuotesCount}
           sentQuotesMrr={sentQuotesMrr}
           sentQuotesCount={sentQuotesCount}
+          onNewProspect={() => setShowNewProspectModal(true)}
         />
 
         {/* Stats Cards */}
@@ -378,6 +381,11 @@ export function Dashboard() {
           <EmailEngine emails={sentEmails} loading={emailsLoading} />
         </div>
       </main>
+
+      <NewProspectModal
+        open={showNewProspectModal}
+        onClose={() => setShowNewProspectModal(false)}
+      />
     </div>
   );
 }
