@@ -403,10 +403,10 @@ export function FiscalCalendar() {
   }, [refreshUrgencies]);
 
   /** Download attestation for a given client — calls DGFIP service */
-  const handleDownloadAttestation = useCallback(async (clientId: string, clientName: string) => {
+  const handleDownloadAttestation = useCallback(async (siren: string, clientId: string, clientName: string) => {
     setDownloadingCert(clientId);
     try {
-      const result = await requestTaxCertificate(clientId);
+      const result = await requestTaxCertificate(siren, clientId);
       if (result.certificate_url.startsWith('#demo')) {
         toast.info(`Attestation ${clientName} : mode démonstration (URL factice).`);
       } else {
@@ -598,7 +598,7 @@ export function FiscalCalendar() {
                       {/* Attestation download button — shown when client has DGFIP data */}
                       {clientHasCert(clientId) && (
                         <button
-                          onClick={() => handleDownloadAttestation(clientId, clientNames[clientId])}
+                          onClick={() => handleDownloadAttestation('', clientId, clientNames[clientId])}
                           disabled={downloadingCert === clientId}
                           title="Télécharger l'attestation de régularité fiscale"
                           className="flex-shrink-0 flex items-center gap-0.5 text-[9px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1 py-0.5 transition-colors disabled:opacity-60"

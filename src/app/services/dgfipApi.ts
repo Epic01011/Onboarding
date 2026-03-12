@@ -128,15 +128,16 @@ export async function syncFiscalDeadlines(): Promise<DGFIPSyncResult> {
 /**
  * Commande et télécharge l'attestation de régularité fiscale pour un client.
  *
- * En mode démonstration, retourne une URL factice pour permettre de tester
- * l'interface sans connexion réelle à la DGFIP.
+ * Appelle directement l'API Entreprise v4 du gouvernement (DGFIP).
+ * En mode démonstration (aucune clé API configurée), retourne une URL factice.
  *
+ * @param siren    - Numéro SIREN de l'unité légale (9 chiffres)
  * @param clientId - Identifiant interne du client (client_id)
  * @returns URL de téléchargement de l'attestation et horodatage d'émission
  */
-export async function requestTaxCertificate(clientId: string): Promise<TaxCertificateResult> {
+export async function requestTaxCertificate(siren: string, clientId: string): Promise<TaxCertificateResult> {
   const config = resolveDgfipConfig();
-  if (!config.baseUrl) {
+  if (!config.apiKey) {
     return {
       client_id: clientId,
       certificate_url: `#demo-attestation-${clientId}`,
@@ -144,11 +145,19 @@ export async function requestTaxCertificate(clientId: string): Promise<TaxCertif
     };
   }
   try {
-    return await dgfipFetch<TaxCertificateResult>(
-      '/webhook/dgfip/tax-certificate',
-      { client_id: clientId, requested_at: new Date().toISOString() },
-      config,
-    );
+    const url = `https://entreprise.api.gouv.fr/v4/dgfip/unites_legales/${siren}/attestation_fiscale`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`API Entreprise error ${response.status}: ${text}`);
+    }
+    return (await response.json()) as TaxCertificateResult;
   } catch (err) {
     console.warn('[dgfipApi] requestTaxCertificate fallback (demo mode):', err instanceof Error ? err.message : err);
     return {
