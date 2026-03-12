@@ -43,7 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { validateDgfipConnection, type DGFIPConnectionStatus } from '../services/dgfipApi';
 
 // ─── Form type (Cabinet & AI tab) ─────────────────────────────────────────────
 
@@ -509,143 +508,6 @@ function GoogleDriveModal({
   );
 }
 
-// ─── DGFIP / Impôts.gouv modal ────────────────────────────────────────────────
-
-function DgfipModal({
-  initialWebhookUrl,
-  initialApiKey,
-  onSuccess,
-  onClose,
-}: {
-  initialWebhookUrl: string;
-  initialApiKey: string;
-  onSuccess: (webhookUrl: string, apiKey: string) => void;
-  onClose: () => void;
-}) {
-  const [webhookUrl, setWebhookUrl] = useState(initialWebhookUrl);
-  const [apiKey, setApiKey] = useState(initialApiKey);
-  const [saving, setSaving] = useState(false);
-  const [testResult, setTestResult] = useState<DGFIPConnectionStatus | null>(null);
-  const [testing, setTesting] = useState(false);
-
-  const handleTest = async () => {
-    if (!webhookUrl.trim()) {
-      toast.error("Renseignez l'URL du webhook avant de tester.");
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await validateDgfipConnection({
-        baseUrl: webhookUrl.trim().replace(/\/$/, ''),
-        apiKey: apiKey.trim(),
-      });
-      setTestResult(result);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!webhookUrl.trim()) { toast.error("L'URL du webhook est requise"); return; }
-    setSaving(true);
-    await new Promise(r => setTimeout(r, 300));
-    onSuccess(webhookUrl.trim(), apiKey.trim());
-    setSaving(false);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg shadow-xl">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-indigo-700 rounded-t-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-white">Configurer Impôts.gouv — DGFIP</p>
-              <p className="text-xs text-white/70 mt-0.5">Synchronisation fiscale via n8n webhook</p>
-            </div>
-            <Landmark className="w-6 h-6 text-white/70" />
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Info banner */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
-            <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-blue-700 space-y-1">
-              <p>
-                Connectez votre workflow n8n qui synchronise les échéances fiscales depuis le portail
-                DGFIP (impots.gouv.fr). L'URL doit pointer vers le webhook de votre instance n8n.
-              </p>
-              <a
-                href="https://impots.gouv.fr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
-              >
-                <ExternalLink className="w-3 h-3" /> impots.gouv.fr
-              </a>
-            </div>
-          </div>
-
-          {/* Webhook URL */}
-          <TextField
-            label="URL du webhook n8n (DGFIP) *"
-            value={webhookUrl}
-            onChange={setWebhookUrl}
-            placeholder="https://n8n.votre-cabinet.fr/webhook/dgfip"
-            hint="URL de base de votre instance n8n dédiée à la synchronisation DGFIP"
-          />
-
-          {/* API key */}
-          <TextField
-            label="Clé API n8n (optionnel)"
-            value={apiKey}
-            onChange={setApiKey}
-            placeholder="••••••••••••••••"
-            type="password"
-            hint="Clé d'authentification de votre webhook n8n (header x-api-key)"
-          />
-
-          {/* Test result */}
-          {testResult && (
-            <div className={`rounded-xl border px-4 py-3 ${testResult.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-              <div className="flex items-center gap-2 mb-1">
-                {testResult.ok
-                  ? <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  : <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                }
-                <p className={`text-xs font-semibold ${testResult.ok ? 'text-green-700' : 'text-red-700'}`}>
-                  {testResult.ok ? 'Connexion réussie' : 'Connexion échouée'}
-                </p>
-              </div>
-              <p className={`text-xs ${testResult.ok ? 'text-green-700' : 'text-red-700'}`}>{testResult.message}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">Annuler</Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTest}
-              disabled={testing || !webhookUrl.trim()}
-              className="flex items-center gap-2"
-            >
-              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              {testing ? 'Test…' : 'Tester'}
-            </Button>
-            <Button type="submit" disabled={saving} className="flex-1 bg-indigo-600 hover:bg-indigo-700 border-0">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
-              {saving ? 'Enregistrement…' : 'Connecter'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 // ─── Page component ───────────────────────────────────────────────────────────
 
@@ -660,8 +522,6 @@ export function SettingsPage() {
   const [checkingKvBridge, setCheckingKvBridge] = useState(false);
   const [kvBridgeResult, setKvBridgeResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [dgfipStatus, setDgfipStatus] = useState<DGFIPConnectionStatus | null>(null);
-  const [testingDgfip, setTestingDgfip] = useState(false);
 
   // Auth context — avoids a getUser() network call on every save
   const { user } = useAuth();
@@ -924,23 +784,6 @@ export function SettingsPage() {
       toast.error(`Test KV echoue: ${message}`);
     } finally {
       setCheckingKvBridge(false);
-    }
-  };
-
-  // ── DGFIP connection test ─────────────────────────────────────────────────
-  const handleTestDgfip = async () => {
-    setTestingDgfip(true);
-    setDgfipStatus(null);
-    try {
-      const result = await validateDgfipConnection();
-      setDgfipStatus(result);
-      if (result.ok) {
-        toast.success(result.message);
-      } else {
-        toast.warning(result.message);
-      }
-    } finally {
-      setTestingDgfip(false);
     }
   };
 
@@ -1904,82 +1747,35 @@ export function SettingsPage() {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <SectionHeader
                   icon={Landmark}
-                  title="Conformité Fiscale — Impôts.gouv (DGFIP)"
-                  description="Synchronisation bidirectionnelle avec le portail DGFIP via n8n pour les échéances TVA, IS, CFE, CVAE."
-                />
-                <ServiceCard
-                  title="Impôts.gouv — DGFIP"
-                  subtitle="Synchronisation fiscale en temps réel — TVA, IS, CFE, CVAE, Taxe foncière"
-                  icon={<Landmark className="w-5 h-5 text-indigo-600" />}
-                  connected={connections.impotsgouv.connected}
-                  displayName={
-                    connections.impotsgouv.connected && connections.impotsgouv.webhookUrl
-                      ? `Webhook : ${connections.impotsgouv.webhookUrl.slice(0, 40)}…`
-                      : connections.impotsgouv.displayName
-                  }
-                  onConnect={() => setModal('impotsgouv')}
-                  onDisconnect={() => {
-                    handleDisconnect('impotsgouv');
-                    setDgfipStatus(null);
-                  }}
+                  title="Conformité Fiscale — DGFIP (API Entreprise)"
+                  description="Attestations de régularité fiscale via l'API Entreprise de l'État. Les échéances fiscales (TVA, IS, CFE) sont récupérées directement depuis Pennylane."
                 />
 
-                {/* Connection test button + result */}
-                {connections.impotsgouv.connected && (
-                  <div className="mt-4 space-y-3">
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-                      <p className="text-xs text-indigo-800 mb-2 font-medium">
-                        ✅ <strong>Impôts.gouv connecté</strong> — Webhook DGFIP configuré.
-                      </p>
-                      <div className="space-y-1 text-xs text-indigo-700">
-                        <p>• Webhook : {connections.impotsgouv.webhookUrl ?? '–'}</p>
-                        <p>• Clé API : {connections.impotsgouv.apiKey ? '••••••••' : 'Aucune'}</p>
-                        <p>• Configuré le : {connections.impotsgouv.connectedAt ? new Date(connections.impotsgouv.connectedAt).toLocaleString('fr-FR') : '–'}</p>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleTestDgfip}
-                      disabled={testingDgfip}
-                      className="flex items-center gap-2"
-                    >
-                      {testingDgfip
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <RefreshCw className="w-4 h-4" />}
-                      {testingDgfip ? 'Test en cours…' : 'Tester la connexion DGFIP'}
-                    </Button>
-
-                    {dgfipStatus && (
-                      <div className={`rounded-xl border px-4 py-3 ${dgfipStatus.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          {dgfipStatus.ok
-                            ? <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                            : <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                          }
-                          <p className={`text-xs font-semibold ${dgfipStatus.ok ? 'text-green-700' : 'text-red-700'}`}>
-                            {dgfipStatus.ok ? 'Connexion opérationnelle' : 'Connexion échouée'}
-                          </p>
-                          {dgfipStatus.latency_ms > 0 && (
-                            <span className="text-xs text-gray-500 ml-auto">{dgfipStatus.latency_ms} ms</span>
-                          )}
-                        </div>
-                        <p className={`text-xs ${dgfipStatus.ok ? 'text-green-700' : 'text-red-700'}`}>{dgfipStatus.message}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!connections.impotsgouv.connected && (
-                  <div className="mt-4 flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                    <Info className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-600">
-                      Mode démo actif — Configurez votre webhook n8n pour activer la synchronisation
-                      fiscale avec impots.gouv.fr (TVA, IS, CFE, CVAE, attestations de régularité).
+                {/* API Entreprise token info */}
+                <div className="mt-4 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-700 space-y-1">
+                    <p>
+                      Les attestations fiscales sont obtenues directement via l'API Entreprise v4
+                      (entreprise.api.gouv.fr). Renseignez la variable d'environnement{' '}
+                      <span className="font-mono font-semibold">VITE_API_ENTREPRISE_TOKEN</span>{' '}
+                      dans votre fichier <span className="font-mono">.env</span> pour activer les
+                      appels réels.
                     </p>
+                    <p>
+                      En l'absence de token, l'application fonctionne en mode démonstration avec des
+                      URL statiques.
+                    </p>
+                    <a
+                      href="https://entreprise.api.gouv.fr/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                    >
+                      <ExternalLink className="w-3 h-3" /> entreprise.api.gouv.fr
+                    </a>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </TabsContent>
@@ -2078,20 +1874,6 @@ export function SettingsPage() {
             fromName: v.fromName || undefined, displayName: v.fromEmail,
           })}
           onClose={() => setModal(null)} />
-      )}
-      {modal === 'impotsgouv' && (
-        <DgfipModal
-          initialWebhookUrl={connections.impotsgouv.webhookUrl ?? ''}
-          initialApiKey={connections.impotsgouv.apiKey ?? ''}
-          onSuccess={(webhookUrl, apiKey) =>
-            handleConnect('impotsgouv', {
-              webhookUrl,
-              apiKey: apiKey || undefined,
-              displayName: `Webhook •••${webhookUrl.slice(-8)}`,
-            })
-          }
-          onClose={() => setModal(null)}
-        />
       )}
     </div>
   );

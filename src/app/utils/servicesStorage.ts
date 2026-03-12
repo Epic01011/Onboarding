@@ -31,7 +31,7 @@ export interface ServiceConnections {
   hubspot: ServiceConnection;
   pipedrive: ServiceConnection;
   pappers: ServiceConnection;
-  /** Portail Impôts.gouv (DGFIP) — synchronisation via n8n webhook */
+  /** Portail Impôts.gouv (DGFIP) — attestations via l'API Entreprise (VITE_API_ENTREPRISE_TOKEN) */
   impotsgouv: ServiceConnection;
 }
 

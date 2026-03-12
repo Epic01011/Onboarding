@@ -6,15 +6,18 @@
  *   Clé API saisie dans /setup → stockée dans localStorage (servicesStorage)
  *
  * ENDPOINTS UTILISÉS :
- *   POST /api/external/v1/customers             → Créer un client
- *   GET  /api/external/v1/customers/{id}        → Récupérer un client
- *   POST /api/external/v1/customers/{id}/notes  → Ajouter une note
- *   POST /api/external/v1/customers/{id}/tags   → Ajouter des tags
- *   POST /api/external/v1/billing_subscriptions → Créer un abonnement
+ *   POST /api/external/v1/customers                          → Créer un client
+ *   GET  /api/external/v1/customers/{id}                    → Récupérer un client
+ *   POST /api/external/v1/customers/{id}/notes              → Ajouter une note
+ *   POST /api/external/v1/customers/{id}/tags               → Ajouter des tags
+ *   POST /api/external/v1/billing_subscriptions             → Créer un abonnement
+ *   GET  /api/external/v1/customers/{id}/accounting_years   → Exercices & échéances
+ *   GET  /api/external/v1/customers/{id}/supplier_invoices  → Dettes fournisseur DGFIP
  */
 
 import { getServiceConnections } from '../utils/servicesStorage';
 import { delay } from '../utils/delay';
+import type { FiscalTask, FiscalTaskType, FiscalTaskStatus, UrgencySemantic } from '../types/dashboard';
 
 export interface PennylaneCustomer {
   name: string;
@@ -496,5 +499,257 @@ export async function sendSEPAMandat(
     return { success: true, mandatUrl: data.sepa_mandate?.signing_url };
   } catch {
     return { success: false, error: 'Erreur mandat SEPA Pennylane' };
+  }
+}
+
+// ─── Fiscal deadlines per company (Zéro Robot approach) ─────────────────────
+
+/** Raw deadline entry returned by the Pennylane API for a company. */
+interface PennylaneRawDeadline {
+  id?: string;
+  type: string;
+  label?: string;
+  due_date: string;
+  status?: string;
+}
+
+/**
+ * Calcule l'urgence d'une échéance à partir de la date limite.
+ * - vert  : plus de 30 jours
+ * - orange : 8–30 jours
+ * - rouge  : 7 jours ou moins (ou dépassée)
+ */
+function computeUrgency(dueDateIso: string): UrgencySemantic {
+  const diff = Math.ceil((new Date(dueDateIso).getTime() - Date.now()) / 86_400_000);
+  if (diff <= 7) return 'red';
+  if (diff <= 30) return 'orange';
+  return 'green';
+}
+
+/** Maps a raw Pennylane deadline type string to our FiscalTaskType. */
+function mapTaskType(raw: string): FiscalTaskType {
+  const normalized = raw.toUpperCase();
+  if (normalized.includes('TVA') && normalized.includes('CA3')) return 'TVA_CA3';
+  if (normalized.includes('TVA') && normalized.includes('CA12')) return 'TVA_CA12';
+  if (normalized.includes('TVA')) return 'TVA_CA3';
+  if (normalized.includes('IS') && normalized.includes('ACOMPTE')) return 'IS_Acompte';
+  if (normalized.includes('IS')) return 'IS_Solde';
+  if (normalized.includes('CFE')) return 'CFE';
+  if (normalized.includes('CVAE')) return 'CVAE';
+  if (normalized.includes('DSN')) return 'DSN';
+  if (normalized.includes('LIASSE') || normalized.includes('FISCALE')) return 'LIASSE_FISCALE';
+  if (normalized.includes('BILAN')) return 'BILAN';
+  if (normalized.includes('DAS2')) return 'DAS2';
+  if (normalized.includes('PAIE')) return 'PAIE';
+  return 'OTHER';
+}
+
+/** Maps a Pennylane filing status to our FiscalTaskStatus. */
+function mapTaskStatus(raw: string | undefined): FiscalTaskStatus {
+  if (!raw) return 'preparation';
+  const s = raw.toLowerCase();
+  if (s === 'filed' || s === 'télétransmis' || s === 'declared') return 'declared';
+  if (s === 'ready' || s === 'prêt') return 'ready';
+  if (s === 'waiting_docs' || s === 'en_attente') return 'waiting_docs';
+  return 'preparation';
+}
+
+/**
+ * Récupère les prochaines échéances fiscales (TVA, IS, CFE, etc.) pour une
+ * entreprise spécifique depuis l'API Pennylane, puis les mappe vers FiscalTask[].
+ *
+ * En mode démo (pas de clé API), retourne des données représentatives.
+ *
+ * @param pennylaneCompanyId - Identifiant Pennylane du client (customer id)
+ */
+export async function getFiscalDeadlines(
+  pennylaneCompanyId: string,
+): Promise<{ success: boolean; data?: FiscalTask[]; error?: string; demo?: boolean }> {
+  await delay(700);
+
+  const apiKey = getPennylaneKey();
+
+  if (!apiKey) {
+    const now = new Date();
+    const demoTasks: FiscalTask[] = [
+      {
+        id: `demo-tva-${pennylaneCompanyId}`,
+        client_id: pennylaneCompanyId,
+        client_name: 'Client (démo)',
+        task_type: 'TVA_CA3',
+        due_date: new Date(now.getFullYear(), now.getMonth() + 1, 15).toISOString().split('T')[0],
+        status: 'preparation',
+        urgency_semantic: 'orange',
+        updated_at: now.toISOString(),
+        sync: { source: 'pennylane', last_synced_at: now.toISOString(), sync_status: 'synced' },
+      },
+      {
+        id: `demo-is-${pennylaneCompanyId}`,
+        client_id: pennylaneCompanyId,
+        client_name: 'Client (démo)',
+        task_type: 'IS_Solde',
+        due_date: new Date(now.getFullYear(), now.getMonth() + 4, 15).toISOString().split('T')[0],
+        status: 'preparation',
+        urgency_semantic: 'green',
+        updated_at: now.toISOString(),
+        sync: { source: 'pennylane', last_synced_at: now.toISOString(), sync_status: 'synced' },
+      },
+    ];
+    return { success: true, demo: true, data: demoTasks };
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/customers/${pennylaneCompanyId}/accounting_years`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      return {
+        success: false,
+        error: err.error ?? err.message ?? `Erreur Pennylane (${res.status})`,
+      };
+    }
+
+    const json = await res.json() as {
+      accounting_years?: Array<{
+        id: string;
+        customer_id: string;
+        customer_name?: string;
+        closing_date: string;
+        status: PennylaneAccountingYear['status'];
+        fiscal_deadlines?: PennylaneRawDeadline[];
+      }>;
+    };
+
+    const synced_at = new Date().toISOString();
+    const tasks: FiscalTask[] = [];
+
+    for (const year of json.accounting_years ?? []) {
+      const deadlines: PennylaneRawDeadline[] = year.fiscal_deadlines ?? computeFiscalDeadlines(year.closing_date, year.status).map(d => ({
+        id: undefined,
+        type: d.type,
+        label: d.label,
+        due_date: d.due_date,
+        status: d.filed ? 'filed' : 'preparation',
+      }));
+
+      for (const dl of deadlines) {
+        const taskType = mapTaskType(dl.type);
+        const taskStatus = mapTaskStatus(dl.status);
+        const urgency = computeUrgency(dl.due_date);
+        tasks.push({
+          id: dl.id ?? `${year.id}-${dl.type}`,
+          client_id: pennylaneCompanyId,
+          client_name: year.customer_name ?? pennylaneCompanyId,
+          task_type: taskType,
+          due_date: dl.due_date,
+          status: taskStatus,
+          urgency_semantic: urgency,
+          updated_at: synced_at,
+          sync: { source: 'pennylane', last_synced_at: synced_at, sync_status: 'synced' },
+        });
+      }
+    }
+
+    return { success: true, data: tasks };
+  } catch (err) {
+    console.error('[PENNYLANE ERROR] getFiscalDeadlines', err);
+    return { success: false, error: 'Erreur de connexion à Pennylane' };
+  }
+}
+
+// ─── Fiscal debts via Pennylane supplier invoices ────────────────────────────
+
+/** A fiscal debt entry (montant dû au fournisseur DGFIP). */
+export interface FiscalDebtEntry {
+  /** Internal Pennylane invoice id */
+  id: string;
+  /** Type of tax debt (TVA, IS, CFE…) */
+  tax_type: string;
+  /** Amount due in euros */
+  amount: number;
+  /** ISO due date */
+  due_date: string;
+  /** Pennylane invoice status */
+  status: string;
+}
+
+/**
+ * Récupère les dettes fiscales envers la DGFIP (fournisseur) depuis la
+ * comptabilité Pennylane d'une entreprise.
+ *
+ * Filtre les factures fournisseur dont le fournisseur est "DGFIP" ou "Trésor Public".
+ * En mode démo, retourne des données fictives représentatives.
+ *
+ * @param pennylaneCompanyId - Identifiant Pennylane du client
+ */
+export async function getFiscalDebts(
+  pennylaneCompanyId: string,
+): Promise<{ success: boolean; data?: FiscalDebtEntry[]; error?: string; demo?: boolean }> {
+  await delay(600);
+
+  const apiKey = getPennylaneKey();
+
+  if (!apiKey) {
+    const now = new Date();
+    const demoDebts: FiscalDebtEntry[] = [
+      {
+        id: `demo-debt-tva-${pennylaneCompanyId}`,
+        tax_type: 'TVA',
+        amount: 2340.5,
+        due_date: new Date(now.getFullYear(), now.getMonth() + 1, 15).toISOString().split('T')[0],
+        status: 'pending',
+      },
+    ];
+    return { success: true, demo: true, data: demoDebts };
+  }
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/customers/${pennylaneCompanyId}/supplier_invoices?supplier=DGFIP&status=unpaid`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      return {
+        success: false,
+        error: err.error ?? err.message ?? `Erreur Pennylane (${res.status})`,
+      };
+    }
+
+    const json = await res.json() as {
+      supplier_invoices?: Array<{
+        id: string;
+        label?: string;
+        total_amount?: number;
+        due_date?: string;
+        status?: string;
+      }>;
+    };
+
+    const data: FiscalDebtEntry[] = (json.supplier_invoices ?? []).map(inv => ({
+      id: inv.id,
+      tax_type: inv.label ?? 'DGFIP',
+      amount: inv.total_amount ?? 0,
+      due_date: inv.due_date ?? new Date().toISOString().split('T')[0],
+      status: inv.status ?? 'unknown',
+    }));
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('[PENNYLANE ERROR] getFiscalDebts', err);
+    return { success: false, error: 'Erreur de connexion à Pennylane' };
   }
 }
