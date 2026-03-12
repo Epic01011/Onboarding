@@ -165,6 +165,13 @@ export const router = createBrowserRouter([
           return { Component: BalanceSheetTracker };
         },
       },
+      {
+        path: "habilitations-fiscales",
+        lazy: async () => {
+          const { HabilitationsFiscales } = await import('./pages/HabilitationsFiscales');
+          return { Component: HabilitationsFiscales };
+        },
+      },
     ],
   },
   // Public route — client portal (magic link)
