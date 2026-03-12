@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Users, ArrowLeft, ArrowRight, Clock, RefreshCw, BookOpen } from 'lucide-react';
+import { Users, ArrowLeft, ArrowRight, Clock, RefreshCw, BookOpen, FileText } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import { getDossierProgress, formatRelativeTime } from '@/app/utils/dossierUtils';
 import type { MissionType } from '@/app/context/OnboardingContext';
+import { AttestationFiscalePanel } from '@/app/components/AttestationFiscalePanel';
 
 type MissionFilter = 'reprise' | 'creation' | null;
 
@@ -29,6 +30,13 @@ export function DossiersActifs() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { dossiers } = useDossiersContext();
+
+  // Panel state — which dossier's attestation panel is open
+  const [attestationPanel, setAttestationPanel] = useState<{
+    dossierId: string;
+    raisonSociale: string;
+    clientEmail?: string;
+  } | null>(null);
 
   // Read ?filter=reprise|creation from URL
   const rawFilter = searchParams.get('filter');
@@ -141,13 +149,16 @@ export function DossiersActifs() {
               const badgeCfg = mt ? FILTER_CONFIG[mt as NonNullable<MissionFilter>] : null;
 
               return (
-                <button
+                <div
                   key={dossier.id}
-                  onClick={() => navigate(`/onboarding/${dossier.id}`)}
                   className="w-full text-left bg-white rounded-xl border border-blue-200 bg-blue-50/20 hover:border-blue-400 hover:shadow-md transition-all p-5 group"
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
+                    {/* Clickable area → navigate to dossier */}
+                    <button
+                      className="flex-1 min-w-0 text-left"
+                      onClick={() => navigate(`/onboarding/${dossier.id}`)}
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold text-gray-900 truncate">{name}</p>
                         {badgeCfg && (
@@ -164,7 +175,23 @@ export function DossiersActifs() {
                         </span>
                         <span>{Math.round(progress * 100)}% complété</span>
                       </div>
-                    </div>
+                    </button>
+
+                    {/* Attestations action button */}
+                    <button
+                      onClick={() =>
+                        setAttestationPanel({
+                          dossierId: dossier.id,
+                          raisonSociale: name,
+                          clientEmail: dossier.clientData.email ?? '',
+                        })
+                      }
+                      title="Attestations de régularité fiscale"
+                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Attestations
+                    </button>
 
                     {/* Progress bar */}
                     <div className="w-24 flex-shrink-0">
@@ -178,12 +205,21 @@ export function DossiersActifs() {
 
                     <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Attestation fiscale side panel */}
+      <AttestationFiscalePanel
+        open={attestationPanel !== null}
+        onClose={() => setAttestationPanel(null)}
+        dossierId={attestationPanel?.dossierId ?? ''}
+        raisonSociale={attestationPanel?.raisonSociale ?? ''}
+        clientEmail={attestationPanel?.clientEmail}
+      />
     </div>
   );
 }
