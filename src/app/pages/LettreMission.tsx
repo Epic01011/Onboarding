@@ -412,7 +412,7 @@ export function LettreMission() {
       } else {
         setProspectPricingData(null);
       }
-    });
+    }).catch(() => setProspectPricingData(null));
   }, [selectedQuote]);
 
   // ── Derive docSignatureStatus from selected quote ─────────────────────────────
@@ -568,7 +568,7 @@ export function LettreMission() {
       let cancelled = false;
       fetchDocumentBySlug(slug).then(content => {
         if (!cancelled) setRawTemplate(content);
-      });
+      }).catch(() => { if (!cancelled) setRawTemplate(null); });
       return () => { cancelled = true; };
     }
     if (!selectedQuote) {
@@ -579,7 +579,7 @@ export function LettreMission() {
     let cancelled = false;
     fetchDocumentBySlug(slug).then(content => {
       if (!cancelled) setRawTemplate(content);
-    });
+    }).catch(() => { if (!cancelled) setRawTemplate(null); });
     return () => { cancelled = true; };
   }, [selectedQuote, manualMode, manualOverrides.clientFormeJuridique]);
 
