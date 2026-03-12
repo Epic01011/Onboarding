@@ -267,7 +267,7 @@ const KanbanColumnArea = memo(function KanbanColumnArea({
 
 // ─── Main Kanban Board ────────────────────────────────────────────────────────
 
-export function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanbanProps) {
+export const ProspectKanban = memo(function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanbanProps) {
   // Memoize the grouping of leads by column to avoid re-filtering on every render
   const leadsByColumn = useMemo(() => {
     const grouped = new Map<KanbanColumn, KanbanLead[]>();
@@ -305,7 +305,7 @@ export function ProspectKanban({ leads, onMoveCard, onCardClick }: ProspectKanba
       </div>
     </DragDropContext>
   );
-}
+});
 
 // ─── Helper: map LeadStatus → KanbanColumn ────────────────────────────────────
 
