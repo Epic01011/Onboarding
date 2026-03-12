@@ -265,6 +265,8 @@ export function EmailEnginePage() {
       } else {
         toast.error('Erreur lors de la suppression');
       }
+    }).catch(() => {
+      toast.error('Erreur lors de la suppression');
     }).finally(() => setDeleting(false));
   }
 
