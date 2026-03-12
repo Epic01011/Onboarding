@@ -470,6 +470,7 @@ export function ConnectServices() {
       pappers: 'Pappers',
       hubspot: 'HubSpot',
       pipedrive: 'Pipedrive',
+      impotsgouv: 'Impôts.gouv (DGFIP)',
     };
     toast.success(`${labels[service]} configuré avec succès`);
   };
