@@ -21,6 +21,8 @@ interface AttestationRecord {
 interface AttestationFiscalePanelProps {
   open: boolean;
   onClose: () => void;
+  /** SIREN de l'unité légale (9 chiffres) transmis à l'API Entreprise */
+  siren: string;
   /** Internal dossier identifier sent to the DGFIP API */
   dossierId: string;
   /** Client display name shown in the panel title and email */
@@ -34,6 +36,7 @@ interface AttestationFiscalePanelProps {
 export function AttestationFiscalePanel({
   open,
   onClose,
+  siren,
   dossierId,
   raisonSociale,
   clientEmail = '',
@@ -50,7 +53,7 @@ export function AttestationFiscalePanel({
   const handleRequestAttestation = async () => {
     setLoading(true);
     try {
-      const result = await requestTaxCertificate(dossierId);
+      const result = await requestTaxCertificate(siren, dossierId);
       const newRecord: AttestationRecord = {
         id: crypto.randomUUID(),
         fetchedAt: result.issued_at,

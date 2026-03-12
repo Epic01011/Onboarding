@@ -33,6 +33,7 @@ export function DossiersActifs() {
 
   // Panel state — which dossier's attestation panel is open
   const [attestationPanel, setAttestationPanel] = useState<{
+    siren: string;
     dossierId: string;
     raisonSociale: string;
     clientEmail?: string;
@@ -181,6 +182,7 @@ export function DossiersActifs() {
                     <button
                       onClick={() =>
                         setAttestationPanel({
+                          siren: dossier.clientData.siren ?? '',
                           dossierId: dossier.id,
                           raisonSociale: name,
                           clientEmail: dossier.clientData.email ?? '',
@@ -216,6 +218,7 @@ export function DossiersActifs() {
       <AttestationFiscalePanel
         open={attestationPanel !== null}
         onClose={() => setAttestationPanel(null)}
+        siren={attestationPanel?.siren ?? ''}
         dossierId={attestationPanel?.dossierId ?? ''}
         raisonSociale={attestationPanel?.raisonSociale ?? ''}
         clientEmail={attestationPanel?.clientEmail}
