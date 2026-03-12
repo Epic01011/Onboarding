@@ -986,12 +986,16 @@ export function Prospection() {
   }
 
   // ── Computed analytics (Chantier 7) ───────────────────────────────────────
-  const sentLeads     = leads.filter(l => l.emailSentAt);
-  const openedLeads   = leads.filter(l => l.openCount > 0);
-  const clickedLeads  = leads.filter(l => l.clicked);
-  const rdvLeads      = leads.filter(l => l.statut === 'interesse');
-  const openRate      = sentLeads.length > 0 ? Math.round((openedLeads.length / sentLeads.length) * 100) : 0;
-  const clickRate     = sentLeads.length > 0 ? Math.round((clickedLeads.length / sentLeads.length) * 100) : 0;
+  const emailAnalytics = useMemo(() => {
+    const sentLeads    = leads.filter(l => l.emailSentAt);
+    const openedCount  = leads.filter(l => l.openCount > 0).length;
+    const clickedCount = leads.filter(l => l.clicked).length;
+    const rdvLeads     = leads.filter(l => l.statut === 'interesse');
+    const openRate     = sentLeads.length > 0 ? Math.round((openedCount / sentLeads.length) * 100) : 0;
+    const clickRate    = sentLeads.length > 0 ? Math.round((clickedCount / sentLeads.length) * 100) : 0;
+    return { sentLeads, rdvLeads, openRate, clickRate };
+  }, [leads]);
+  const { sentLeads, rdvLeads, openRate, clickRate } = emailAnalytics;
 
   // ── Send quote with magic acceptance link ────────────────────────────────
   async function handleSendQuote(quote: ProspectQuote) {

@@ -138,7 +138,10 @@ export function ProspectMapView({ prospects, onAddToCampaign }: ProspectMapViewP
     });
   }, [prospects]);
 
-  const positions: [number, number][] = markers.map(m => m.coords);
+  const positions = useMemo<[number, number][]>(
+    () => markers.map(m => m.coords),
+    [markers],
+  );
 
   return (
     <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
