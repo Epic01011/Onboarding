@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import {
   getAllDossiers as getLocalDossiers,
   getDossier as getLocalDossier,
@@ -141,6 +142,7 @@ export const useDossiersStore = create<DossiersStore>((set, get) => ({
         await saveDossierBackend(updated, _accessToken, _userId);
       } catch (err) {
         console.error('[Dossiers] Failed to save dossier to backend:', err);
+        toast.error('La sauvegarde a échoué. Vos modifications sont conservées localement.');
       }
     }
   },

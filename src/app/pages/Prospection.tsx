@@ -805,6 +805,11 @@ export function Prospection() {
       const storeId = sirenToStoreId.get(siren);
       if (storeId) idsToDelete.push(storeId);
     }
+    // Close the detail sheet if the active prospect is being deleted
+    const activeSiren = sheetId ? leads.find(l => l.id === sheetId)?.siren : undefined;
+    if (activeSiren && sirenSet.has(activeSiren)) {
+      setSheetId(null);
+    }
     // Snapshot leads to restore on total failure
     const prevLeads = leads;
     // Optimistic update

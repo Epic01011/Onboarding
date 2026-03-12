@@ -311,14 +311,18 @@ export function BalanceSheetTracker() {
   const [filterManager, setFilterManager] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
 
-  // Load from Supabase on mount. If store is already empty (first visit),
-  // also trigger a Pennylane sync — checked synchronously before the async DB load.
+  // Load from Supabase on mount. If store is still empty after the DB load
+  // (first visit or empty DB), trigger a Pennylane sync.
   useEffect(() => {
-    const needsSync = balanceSheets.length === 0;
-    loadBalanceSheetsFromSupabase();
-    if (needsSync) {
+    loadBalanceSheetsFromSupabase().then(() => {
+      const current = useDashboardStore.getState().balanceSheets;
+      if (current.length === 0) {
+        syncBalanceSheetData();
+      }
+    }).catch((err: unknown) => {
+      console.error('[BalanceSheetTracker] Failed to load from Supabase:', err);
       syncBalanceSheetData();
-    }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
