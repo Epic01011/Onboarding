@@ -8,7 +8,7 @@ import {
   Eye, MousePointerClick, Sparkles, PhoneCall, Linkedin,
   TrendingUp, CalendarDays, KanbanSquare, List, Map as MapIcon,
   Zap, CalendarCheck, PartyPopper, XCircle, Clock, ArrowLeft,
-  Download, Upload, Trash2, Pencil, FileText,
+  Download, Upload, Trash2, Pencil, FileText, Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
@@ -50,6 +50,7 @@ import type { RsvpStatus } from './EventsCampaign';
 import { useProspectStore, type ProspectRow } from '../store/useProspectStore';
 import { getQuotesByProspect, generateQuoteAcceptToken, type ProspectQuote } from '../utils/supabaseSync';
 import { sendEmail } from '../services/emailService';
+import { NewProspectModal } from '../../components/crm/NewProspectModal';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -302,6 +303,9 @@ export function Prospection() {
 
   // ── Excel Import/Export ───────────────────────────────────────────────────
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // ── New prospect modal ────────────────────────────────────────────────────
+  const [showNewProspectModal, setShowNewProspectModal] = useState(false);
 
   // ── View mode (Chantier 9 + 11) ──────────────────────────────────────────
   const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'carte'>('list');
@@ -1473,6 +1477,15 @@ export function Prospection() {
                 </div>
               );
             })()}
+
+            {/* Create manually */}
+            <button
+              onClick={() => setShowNewProspectModal(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Créer manuellement
+            </button>
 
             {/* Export Excel */}
             <button
@@ -2685,6 +2698,11 @@ export function Prospection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NewProspectModal
+        open={showNewProspectModal}
+        onClose={() => setShowNewProspectModal(false)}
+      />
     </div>
   );
 }
