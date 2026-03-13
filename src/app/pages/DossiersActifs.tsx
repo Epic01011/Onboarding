@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Users, ArrowLeft, ArrowRight, Clock, RefreshCw, BookOpen, FileText } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
-import { getDossierProgress, formatRelativeTime } from '@/app/utils/dossierUtils';
+import { getDossierProgress, isDossierStarted, formatRelativeTime } from '@/app/utils/dossierUtils';
 import type { MissionType } from '@/app/context/OnboardingContext';
 import { AttestationFiscalePanel } from '@/app/components/AttestationFiscalePanel';
 
@@ -47,7 +47,9 @@ export function DossiersActifs() {
   const activeDossiers = useMemo(() =>
     dossiers.filter(d => {
       const p = getDossierProgress(d);
-      if (p <= 0 || p >= 1) return false;
+      if (p >= 1) return false;
+      // Include dossiers that have been started (at least one step active or completed)
+      if (!isDossierStarted(d)) return false;
       if (!activeFilter) return true;
       // Use native missionType first, fall back to clientData for older records
       const mt: MissionType = d.missionType || d.clientData.missionType || '';

@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import { useDossiersContext } from '@/app/context/DossiersContext';
 import type { StepStatus, MissionType } from '@/app/context/OnboardingContext';
-import { TOTAL_STEPS } from '@/app/context/OnboardingContext';
+import { TOTAL_STEPS, CREATION_TOTAL_STEPS } from '@/app/context/OnboardingContext';
 import type { DossierData } from '@/app/utils/localStorage';
-import { getDossierProgress } from '@/app/utils/dossierUtils';
+import { getDossierProgress, isDossierStarted } from '@/app/utils/dossierUtils';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/app/components/ui/card';
@@ -94,7 +94,7 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
     for (const d of dossiers) {
       const cd = d.clientData;
       const p = getDossierProgress(d);
-      const inProgress = p > 0 && p < 1;
+      const inProgress = p < 1 && isDossierStarted(d);
 
       if (inProgress) clientsActifs++;
 
@@ -202,7 +202,8 @@ export function HomeDashboard({ signedClients = [], validatedQuotesCount = 0, se
 
   /** Build the initial dossier payload with the correct missionType and step statuses. */
   function buildNewDossier(dossier: DossierData, missionType: MissionType): DossierData {
-    const statuses = Array(TOTAL_STEPS).fill('pending') as StepStatus[];
+    const totalSteps = missionType === 'creation' ? CREATION_TOTAL_STEPS : TOTAL_STEPS;
+    const statuses = Array(totalSteps).fill('pending') as StepStatus[];
     statuses[0] = 'active';
     return {
       ...dossier,

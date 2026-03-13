@@ -7,6 +7,15 @@ export function getDossierProgress(dossier: DossierData): number {
 }
 
 /**
+ * Returns true if the dossier has been started — i.e. at least one step is
+ * 'active' or 'completed'. Dossiers where every step is still 'pending' are
+ * considered not yet started.
+ */
+export function isDossierStarted(dossier: DossierData): boolean {
+  return dossier.stepStatuses.some(s => s === 'active' || s === 'completed');
+}
+
+/**
  * Derives the logical status of a dossier from its step statuses.
  * A dossier is "completed" when every step is either 'completed' or 'skipped'
  * (i.e. no step is still 'pending' or 'active').
