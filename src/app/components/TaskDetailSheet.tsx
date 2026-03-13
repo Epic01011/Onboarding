@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import {
-  AlertTriangle, Clock, Send, Paperclip, Trash2, FileText, Loader2,
+  AlertTriangle, Clock, Send, Paperclip, Trash2, FileText, Loader2, CalendarPlus,
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from './ui/select';
 import { useTaskStore, type TaskStatus, type TaskPriority } from '../store/useTaskStore';
+import { downloadTaskIcs } from '../utils/icsExport';
 
 // ─── Label / color maps ───────────────────────────────────────────────────────
 
@@ -219,8 +220,27 @@ export function TaskDetailSheet() {
                   onChange={e => handleFieldUpdate({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
                   className="text-sm h-8"
                 />
-                <div className="mt-1">
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
                   <DeadlineDisplay dueDate={task.dueDate} />
+                  {task.dueDate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs gap-1 text-slate-500 hover:text-slate-800"
+                      onClick={() => {
+                        downloadTaskIcs({
+                          id: task.id,
+                          title: task.title,
+                          description: task.description,
+                          dueDate: task.dueDate!,
+                        });
+                        toast.success('Fichier .ics téléchargé — importez-le dans votre agenda.');
+                      }}
+                    >
+                      <CalendarPlus className="w-3 h-3" />
+                      Exporter agenda
+                    </Button>
+                  )}
                 </div>
               </div>
 

@@ -8,7 +8,7 @@ import {
   Eye, MousePointerClick, Sparkles, PhoneCall, Linkedin,
   TrendingUp, CalendarDays, KanbanSquare, List, Map as MapIcon,
   Zap, CalendarCheck, PartyPopper, XCircle, Clock, ArrowLeft,
-  Download, Upload, Trash2, Pencil, FileText, Plus,
+  Download, Upload, Trash2, Pencil, FileText, Plus, CalendarPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
@@ -51,6 +51,7 @@ import { useProspectStore, type ProspectRow } from '../store/useProspectStore';
 import { getQuotesByProspect, generateQuoteAcceptToken, type ProspectQuote } from '../utils/supabaseSync';
 import { sendEmail } from '../services/emailService';
 import { NewProspectModal } from '../../components/crm/NewProspectModal';
+import { downloadProspectActionIcs } from '../utils/icsExport';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -2379,6 +2380,7 @@ export function Prospection() {
                         className="w-full h-8 px-3 border border-gray-200 rounded-lg text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
                       />
                     </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={saveCrmFields}
                       disabled={crmSaved}
@@ -2393,6 +2395,33 @@ export function Prospection() {
                         : <><TrendingUp className="w-3.5 h-3.5" /> Enregistrer</>
                       }
                     </button>
+                    {draftNextActionDate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!activeLead) return;
+                          downloadProspectActionIcs(
+                            {
+                              id: activeLead.id,
+                              nomSociete: activeLead.nomSociete,
+                              dirigeant: activeLead.dirigeantPrincipal
+                                ? [activeLead.dirigeantPrincipal.prenom, activeLead.dirigeantPrincipal.nom]
+                                    .filter(Boolean)
+                                    .join(' ') || null
+                                : null,
+                            },
+                            draftNextActionDate,
+                            notesMap[sheetId ?? ''],
+                          );
+                          toast.success('Fichier .ics téléchargé — importez-le dans votre agenda.');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all"
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" />
+                        Exporter agenda
+                      </button>
+                    )}
+                    </div>
                   </div>
                 </section>
 
