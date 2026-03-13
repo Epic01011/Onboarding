@@ -26,37 +26,36 @@ import { ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { useOnboardingDraftStore } from '../store/useOnboardingDraftStore';
 import { useProspectStore } from '../store/useProspectStore';
 
-// Store component references (not JSX instances) to avoid stale context issues
-const STEP_COMPONENTS: Record<number, React.ComponentType> = {
-  1: Step1,
-  2: Step2,
-  3: Step3,
-  4: Step4,
-  5: Step5,
-  6: Step6,
-  7: Step7,
-  8: Step8,
-  9: Step9,
-  10: Step10,
-  11: Step11,
-};
-
-/** Components for the 7-step Création de société linear flow. */
-const CREATION_STEP_COMPONENTS: Record<number, React.ComponentType> = {
-  1: StepCreation1Prospect,
-  2: StepCreation2Cadrage,
-  3: StepCreation3Collecte,
-  4: StepCreation4Signature,
-  5: StepCreation5Formalites,
-  6: StepCreation6SuiviKbis,
-  7: StepCreation7Cloture,
+// Single map from step ID (string) → component, covering both reprise and création flows.
+// StepRenderer resolves the current step via activeSteps[currentStep-1].id so that
+// the displayed component is always driven by the dynamically-filtered active step list.
+const COMPONENT_MAP: Record<string, React.ComponentType> = {
+  // Reprise de dossier — 11 steps
+  'step1':  Step1,
+  'step2':  Step2,
+  'step3':  Step3,
+  'step4':  Step4,
+  'step5':  Step5,
+  'step6':  Step6,
+  'step7':  Step7,
+  'step8':  Step8,
+  'step9':  Step9,
+  'step10': Step10,
+  'step11': Step11,
+  // Création de société — 7 steps
+  'creation-1': StepCreation1Prospect,
+  'creation-2': StepCreation2Cadrage,
+  'creation-3': StepCreation3Collecte,
+  'creation-4': StepCreation4Signature,
+  'creation-5': StepCreation5Formalites,
+  'creation-6': StepCreation6SuiviKbis,
+  'creation-7': StepCreation7Cloture,
 };
 
 function StepRenderer() {
-  const { currentStep, clientData } = useOnboarding();
-  const isCreation = clientData.missionType === 'creation';
-  const map = isCreation ? CREATION_STEP_COMPONENTS : STEP_COMPONENTS;
-  const StepComponent = map[currentStep] ?? Step1;
+  const { currentStep, activeSteps } = useOnboarding();
+  const stepId = activeSteps[currentStep - 1]?.id ?? '';
+  const StepComponent: React.ComponentType = COMPONENT_MAP[stepId] ?? Step1;
   return <StepComponent />;
 }
 
