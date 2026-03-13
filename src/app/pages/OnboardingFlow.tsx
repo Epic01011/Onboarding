@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { OnboardingProvider, useOnboarding } from '../context/OnboardingContext';
+import { OnboardingProvider, useOnboarding, CREATION_TOTAL_STEPS, TOTAL_STEPS } from '../context/OnboardingContext';
 import { useDossiersContext } from '../context/DossiersContext';
 import { Sidebar } from '../components/Sidebar';
 import { TopBar } from '../components/TopBar';
@@ -125,6 +125,13 @@ function OnboardingContent({ dossierId }: { dossierId: string }) {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
+      // Only persist the step statuses that belong to the active flow:
+      // 7 for creation, 11 for reprise. The context always holds 11 slots
+      // (initialised from TOTAL_STEPS), so we slice before writing back.
+      const isCreation = clientDataRef.current.missionType === 'creation';
+      const activeTotalSteps = isCreation ? CREATION_TOTAL_STEPS : TOTAL_STEPS;
+      const slicedStatuses = stepStatusesRef.current.slice(0, activeTotalSteps);
+
       const dossier = getDossier(dossierId);
       if (dossier) {
         // Persist to Supabase (via DossiersContext → backendApi)
@@ -132,7 +139,7 @@ function OnboardingContent({ dossierId }: { dossierId: string }) {
           ...dossier,
           clientData: clientDataRef.current,
           currentStep: currentStepRef.current,
-          stepStatuses: stepStatusesRef.current,
+          stepStatuses: slicedStatuses,
         });
       }
 
@@ -141,7 +148,7 @@ function OnboardingContent({ dossierId }: { dossierId: string }) {
       saveDraft(dossierId, {
         clientData: clientDataRef.current,
         currentStep: currentStepRef.current,
-        stepStatuses: stepStatusesRef.current,
+        stepStatuses: slicedStatuses,
         prospectId: prospectIdRef.current,
       });
       setLastSavedAt(now);
