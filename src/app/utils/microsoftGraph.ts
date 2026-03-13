@@ -401,3 +401,102 @@ export async function shareSharePointItem(
     },
   );
 }
+
+// ─── Microsoft To Do ───────────────────────────────────────────────────────────────────
+
+/** Liste de tâches Microsoft To Do */
+export interface TodoList {
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+  isShared: boolean;
+  wellknownListName?: string;
+}
+
+/** Tâche Microsoft To Do */
+export interface TodoTask {
+  id: string;
+  title: string;
+  status: 'notStarted' | 'inProgress' | 'completed' | 'waitingOnOthers' | 'deferred';
+  importance: 'low' | 'normal' | 'high';
+  dueDateTime?: { dateTime: string; timeZone: string } | null;
+  body?: { content: string; contentType: 'text' | 'html' };
+  createdDateTime: string;
+  lastModifiedDateTime: string;
+}
+
+/** Données d'entrée pour créer ou mettre à jour une tâche To Do */
+export interface TodoTaskInput {
+  title?: string;
+  status?: TodoTask['status'];
+  importance?: TodoTask['importance'];
+  dueDateTime?: { dateTime: string; timeZone: string } | null;
+  body?: { content: string; contentType: 'text' | 'html' };
+}
+
+/**
+ * Récupère toutes les listes Microsoft To Do de l'utilisateur connecté.
+ * Endpoint : GET /me/todo/lists
+ */
+export async function getTodoLists(token: string): Promise<TodoList[]> {
+  const response = await graphFetch<{ value: TodoList[] }>(
+    `${GRAPH}/me/todo/lists`,
+    token,
+  );
+  return response.value ?? [];
+}
+
+/**
+ * Crée une tâche dans une liste Microsoft To Do.
+ * Endpoint : POST /me/todo/lists/{listId}/tasks
+ */
+export async function createTodoTask(
+  token: string,
+  listId: string,
+  taskData: TodoTaskInput,
+): Promise<TodoTask> {
+  return graphFetch<TodoTask>(
+    `${GRAPH}/me/todo/lists/${listId}/tasks`,
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    },
+  );
+}
+
+/**
+ * Met à jour une tâche existante dans Microsoft To Do.
+ * Endpoint : PATCH /me/todo/lists/{listId}/tasks/{taskId}
+ */
+export async function updateTodoTask(
+  token: string,
+  listId: string,
+  taskId: string,
+  taskData: Partial<TodoTaskInput>,
+): Promise<TodoTask> {
+  return graphFetch<TodoTask>(
+    `${GRAPH}/me/todo/lists/${listId}/tasks/${taskId}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(taskData),
+    },
+  );
+}
+
+/**
+ * Supprime une tâche dans Microsoft To Do.
+ * Endpoint : DELETE /me/todo/lists/{listId}/tasks/{taskId}
+ */
+export async function deleteTodoTask(
+  token: string,
+  listId: string,
+  taskId: string,
+): Promise<void> {
+  await graphFetch<void>(
+    `${GRAPH}/me/todo/lists/${listId}/tasks/${taskId}`,
+    token,
+    { method: 'DELETE' },
+  );
+}
