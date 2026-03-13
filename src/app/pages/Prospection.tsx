@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import {
   Radar, Search, Mail, Filter, Bookmark, BookmarkCheck,
   Building2, User, Phone, Tag, Send, X, SlidersHorizontal,
-  Loader2, MapPin, Calendar, BarChart2, Briefcase, ChevronRight,
+  Loader2, MapPin, Calendar, BarChart2, Briefcase, ChevronRight, ChevronLeft,
   MessageSquare, Check, RefreshCw, ExternalLink,
   Eye, MousePointerClick, Sparkles, PhoneCall, Linkedin,
   TrendingUp, CalendarDays, KanbanSquare, List, Map as MapIcon,
@@ -308,7 +308,10 @@ export function Prospection() {
   const [showNewProspectModal, setShowNewProspectModal] = useState(false);
 
   // ── View mode (Chantier 9 + 11) ──────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'carte'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'carte'>('kanban');
+
+  // ── Sidebar open/close ────────────────────────────────────────────────────
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ── Icebreaker generation loading (Chantier 8) ────────────────────────────
   const [generatingIcebreakers, setGeneratingIcebreakers] = useState(false);
@@ -1002,6 +1005,10 @@ export function Prospection() {
     setNoteSaved(true);
     if (noteSavedTimerRef.current) clearTimeout(noteSavedTimerRef.current);
     noteSavedTimerRef.current = setTimeout(() => setNoteSaved(false), 2500);
+    // Persist note text + refresh last_activity_at in Supabase
+    if (storeProspects.some(p => p.id === sheetId)) {
+      updateProspectFields(sheetId, { notes: draftNote, last_activity_at: new Date().toISOString() });
+    }
   }
 
   // ── CRM fields save (estimated_value + next_action_date) ─────────────────
@@ -1032,7 +1039,8 @@ export function Prospection() {
   // ── Call log (Chantier 10) — update local state + persist to Supabase ───────
   function logCall() {
     if (!sheetId || !callLogDraft.trim()) return;
-    const entry = `[${new Date().toLocaleString('fr-FR')}] ${callLogDraft.trim()}`;
+    const now = new Date();
+    const entry = `[${now.toLocaleString('fr-FR')}] ${callLogDraft.trim()}`;
     const currentLead = leads.find(l => l.id === sheetId);
     const updatedCallLogs = [...(currentLead?.callLogs ?? []), entry];
 
@@ -1045,7 +1053,7 @@ export function Prospection() {
 
     // Persist to Supabase only if the lead has a DB row
     if (storeProspects.some(p => p.id === sheetId)) {
-      updateProspectFields(sheetId, { call_logs: updatedCallLogs });
+      updateProspectFields(sheetId, { call_logs: updatedCallLogs, last_activity_at: now.toISOString() });
     }
   }
 
@@ -1265,30 +1273,57 @@ export function Prospection() {
     <div className="flex h-screen overflow-hidden bg-gray-50">
 
       {/* ══ LEFT SIDEBAR — Filters ═══════════════════════════════════════════ */}
-      <aside className="w-72 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+      <aside className={`${sidebarOpen ? 'w-72' : 'w-12'} flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden transition-all duration-200`}>
 
         {/* Header */}
-        <div className="px-5 py-5 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => navigate('/')}
-              className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
-              title="Retour au dashboard"
-            >
-              <ArrowLeft className="w-4 h-4 text-gray-600" />
-            </button>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Radar className="w-4 h-4 text-white" />
+        <div className={`${sidebarOpen ? 'px-5 py-5' : 'px-2 py-3'} border-b border-gray-100`}>
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => navigate('/')}
+                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+                title="Retour au dashboard"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-600" />
+              </button>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Radar className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 leading-none">Prospection</p>
+                <p className="text-xs text-gray-400 mt-0.5">Acquisition client automatisée</p>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
+                title="Réduire le panneau"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-600" />
+              </button>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900 leading-none">Prospection</p>
-              <p className="text-xs text-gray-400 mt-0.5">Acquisition client automatisée</p>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => navigate('/')}
+                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+                title="Retour au dashboard"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-600" />
+              </button>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="w-8 h-8 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-colors"
+                title="Ouvrir les filtres"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+              </button>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Filters */}
-        <div className="px-5 py-5 space-y-5 flex-1">
+        {/* Filters — only visible when sidebar is open */}
+        {sidebarOpen && (
+        <div className="px-5 py-5 space-y-5 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Filtres de recherche
@@ -1438,6 +1473,7 @@ export function Prospection() {
             )}
           </div>
         </div>
+        )}
       </aside>
 
       {/* ══ MAIN CONTENT — Leads table ═══════════════════════════════════════ */}
@@ -2586,6 +2622,38 @@ export function Prospection() {
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                     <MessageSquare className="w-3.5 h-3.5" /> Notes & commentaires
                   </h3>
+
+                  {/* Auto follow-up toggle */}
+                  {(() => {
+                    const autoFollowUpEnabled = !(storeProspects.find(p => p.id === activeLead.id)?.disable_auto_follow_up ?? false);
+                    return (
+                      <div className="flex items-center justify-between py-2 px-3 bg-amber-50 border border-amber-100 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                          <span className="text-xs font-medium text-amber-800">Relances automatiques J+7</span>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={autoFollowUpEnabled}
+                          onClick={async () => {
+                            const storeProspect = storeProspects.find(p => p.id === activeLead.id);
+                            if (!storeProspect) return;
+                            await updateProspectFields(activeLead.id, { disable_auto_follow_up: !storeProspect.disable_auto_follow_up });
+                          }}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+                            autoFollowUpEnabled ? 'bg-amber-500' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                              autoFollowUpEnabled ? 'translate-x-4' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })()}
                   <Textarea
                     placeholder={`Ex : Appelé le ${new Date().toLocaleDateString('fr-FR')}, rappeler en septembre…`}
                     value={draftNote}

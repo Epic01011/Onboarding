@@ -97,6 +97,10 @@ export interface ProspectRow {
   score: number | null;
   /** Valeur financière estimée du contrat (€) */
   estimated_value: number | null;
+  /** Désactive les relances automatiques J+7 pour ce prospect */
+  disable_auto_follow_up: boolean | null;
+  /** Date de la dernière activité sur la timeline (ISO date string) */
+  last_activity_at: string | null;
   /** Date de la prochaine action commerciale (ISO date string) */
   next_action_date: string | null;
   created_at: string;
@@ -157,6 +161,10 @@ export interface ProspectInput {
   score?: number | null;
   /** Valeur financière estimée du contrat (€) */
   estimated_value?: number | null;
+  /** Désactive les relances automatiques J+7 pour ce prospect */
+  disable_auto_follow_up?: boolean | null;
+  /** Date de la dernière activité sur la timeline (ISO date string) */
+  last_activity_at?: string | null;
   /** Date de la prochaine action commerciale (ISO date string) */
   next_action_date?: string | null;
 }
@@ -304,6 +312,8 @@ export const useProspectStore = create<ProspectStore>((set, get) => ({
           score: input.score ?? null,
           estimated_value: input.estimated_value ?? null,
           next_action_date: input.next_action_date ?? null,
+          disable_auto_follow_up: input.disable_auto_follow_up ?? false,
+          last_activity_at: input.last_activity_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .select()
@@ -364,6 +374,8 @@ export const useProspectStore = create<ProspectStore>((set, get) => ({
         score: input.score ?? null,
         estimated_value: input.estimated_value ?? null,
         next_action_date: input.next_action_date ?? null,
+        disable_auto_follow_up: input.disable_auto_follow_up ?? false,
+        last_activity_at: input.last_activity_at ?? new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
 

@@ -109,10 +109,14 @@ export function ActionCenter() {
       .filter(p => {
         if (!ACTIVE_PROSPECT_STATUSES.has(p.status)) return false;
         if (dismissedProspectIds.has(p.id)) return false;
-        return now - new Date(p.updated_at).getTime() > thresholdMs;
+        if (p.disable_auto_follow_up) return false;
+        // Use last_activity_at when available; fall back to updated_at
+        const referenceDate = p.last_activity_at ?? p.updated_at;
+        return now - new Date(referenceDate).getTime() > thresholdMs;
       })
       .map(p => {
-        const elapsedMs = now - new Date(p.updated_at).getTime();
+        const referenceDate = p.last_activity_at ?? p.updated_at;
+        const elapsedMs = now - new Date(referenceDate).getTime();
         return {
           id: p.id,
           companyName: p.company_name,
