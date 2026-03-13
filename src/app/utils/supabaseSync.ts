@@ -1608,6 +1608,8 @@ export interface TaskRecord {
   createdAt: string;
   updatedAt: string;
   createdBy?: string | null;
+  microsoftTaskId?: string | null;
+  microsoftListId?: string | null;
 }
 
 export interface TaskCommentRecord {
@@ -1634,17 +1636,19 @@ export interface TaskAttachmentRecord {
 
 function rowToTask(row: Record<string, unknown>): TaskRecord {
   return {
-    id:          row.id          as string,
-    title:       row.title       as string,
-    description: (row.description as string | null) ?? undefined,
-    dossierId:   (row.dossier_id  as string | null) ?? null,
-    assigneeId:  (row.assignee_id as string | null) ?? null,
-    status:      (row.status      as TaskStatus)    ?? 'todo',
-    priority:    (row.priority    as TaskPriority)  ?? 'medium',
-    dueDate:     (row.due_date    as string | null) ?? null,
-    createdAt:   row.created_at  as string,
-    updatedAt:   row.updated_at  as string,
-    createdBy:   (row.created_by  as string | null) ?? null,
+    id:                row.id          as string,
+    title:             row.title       as string,
+    description:       (row.description       as string | null) ?? undefined,
+    dossierId:         (row.dossier_id         as string | null) ?? null,
+    assigneeId:        (row.assignee_id        as string | null) ?? null,
+    status:            (row.status             as TaskStatus)    ?? 'todo',
+    priority:          (row.priority           as TaskPriority)  ?? 'medium',
+    dueDate:           (row.due_date           as string | null) ?? null,
+    createdAt:         row.created_at  as string,
+    updatedAt:         row.updated_at  as string,
+    createdBy:         (row.created_by         as string | null) ?? null,
+    microsoftTaskId:   (row.microsoft_task_id  as string | null) ?? null,
+    microsoftListId:   (row.microsoft_list_id  as string | null) ?? null,
   };
 }
 
@@ -1705,13 +1709,15 @@ export async function createTask(
     const { data, error } = await supabase
       .from('tasks')
       .insert({
-        title:       payload.title,
-        description: payload.description ?? null,
-        dossier_id:  payload.dossierId   ?? null,
-        assignee_id: payload.assigneeId  ?? null,
-        status:      payload.status,
-        priority:    payload.priority,
-        due_date:    payload.dueDate     ?? null,
+        title:               payload.title,
+        description:         payload.description         ?? null,
+        dossier_id:          payload.dossierId           ?? null,
+        assignee_id:         payload.assigneeId          ?? null,
+        status:              payload.status,
+        priority:            payload.priority,
+        due_date:            payload.dueDate             ?? null,
+        microsoft_task_id:   payload.microsoftTaskId     ?? null,
+        microsoft_list_id:   payload.microsoftListId     ?? null,
       })
       .select()
       .single();
@@ -1736,13 +1742,15 @@ export async function updateTask(
 ): Promise<SyncResult> {
   try {
     const payload: Record<string, unknown> = {};
-    if (updates.title       !== undefined) payload.title       = updates.title;
-    if (updates.description !== undefined) payload.description = updates.description ?? null;
-    if (updates.dossierId   !== undefined) payload.dossier_id  = updates.dossierId   ?? null;
-    if (updates.assigneeId  !== undefined) payload.assignee_id = updates.assigneeId  ?? null;
-    if (updates.status      !== undefined) payload.status      = updates.status;
-    if (updates.priority    !== undefined) payload.priority    = updates.priority;
-    if (updates.dueDate     !== undefined) payload.due_date    = updates.dueDate     ?? null;
+    if (updates.title             !== undefined) payload.title             = updates.title;
+    if (updates.description       !== undefined) payload.description       = updates.description ?? null;
+    if (updates.dossierId         !== undefined) payload.dossier_id        = updates.dossierId   ?? null;
+    if (updates.assigneeId        !== undefined) payload.assignee_id       = updates.assigneeId  ?? null;
+    if (updates.status            !== undefined) payload.status            = updates.status;
+    if (updates.priority          !== undefined) payload.priority          = updates.priority;
+    if (updates.dueDate           !== undefined) payload.due_date          = updates.dueDate     ?? null;
+    if (updates.microsoftTaskId   !== undefined) payload.microsoft_task_id = updates.microsoftTaskId ?? null;
+    if (updates.microsoftListId   !== undefined) payload.microsoft_list_id = updates.microsoftListId ?? null;
 
     if (Object.keys(payload).length === 0) return { success: true };
 
