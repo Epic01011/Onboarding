@@ -366,7 +366,7 @@ export default function TaskManager() {
         )}
 
         {/* ── Tabs: Liste | Kanban ──────────────────────────────────────────── */}
-        <Tabs defaultValue="list">
+        <Tabs defaultValue="kanban">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <TabsList>
               <TabsTrigger value="list">
