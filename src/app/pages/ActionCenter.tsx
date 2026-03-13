@@ -123,7 +123,7 @@ export function ActionCenter() {
   }, [prospects, dismissedProspectIds]);
 
   // ── Selection helpers ───────────────────────────────────────────────────────
-  const allIds = items.map(i => i.dossier.id);
+  const allIds = useMemo(() => items.map(i => i.dossier.id), [items]);
   const isAllSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
   const isIndeterminate = !isAllSelected && allIds.some(id => selected.has(id));
 

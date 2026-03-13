@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   Radar, Search, Mail, Filter, Bookmark, BookmarkCheck,
@@ -39,7 +39,7 @@ import {
   searchProspects,
 } from '../services/prospectApi';
 import { EmailCampaignModal, type SequenceStepConfig } from '../components/EmailCampaignModal';
-import { ProspectKanban, type KanbanColumn, statusToKanban, kanbanToStatus } from '../components/ProspectKanban';
+import { ProspectKanban, type KanbanLead, type KanbanColumn, statusToKanban, kanbanToStatus } from '../components/ProspectKanban';
 import { ProspectMapView } from '../components/ProspectMapView';
 import { computeLeadScore, scoreColorClass, getCabinetSpecialty, type CabinetSpecialty } from '../utils/leadScoring';
 import { getCabinetInfo, getServiceConnections, getEmailConfig } from '../utils/servicesStorage';
@@ -399,7 +399,7 @@ export function Prospection() {
       }
       setQuotesLoading(false);
     }).catch(() => setQuotesLoading(false));
-  }, [sheetId, storeProspects, quotesMap]);
+  }, [sheetId, storeProspects]); // eslint-disable-line react-hooks/exhaustive-deps -- quotesMap is only used as a guard inside the effect, not as a trigger; including it would cause the effect to re-run after it sets quotesMap, potentially re-triggering the fetch
 
   // ── Sync store.prospects → local leads (initial load only) ───────────────
   useEffect(() => {
@@ -497,6 +497,48 @@ export function Prospection() {
       someSelected: anySel && !allSel,
     };
   }, [filtered, selected]);
+
+  // ── Memoized derived arrays for view components ───────────────────────────
+  // Avoids creating new object/array references on every render and breaking
+  // React.memo() optimisations on ProspectMapView and ProspectKanban.
+  const mapProspects = useMemo(
+    () => filtered.map(l => ({
+      siren: l.siren,
+      nomSociete: l.nomSociete,
+      formeJuridique: l.formeJuridique,
+      secteur: l.secteur,
+      ville: l.ville,
+      codePostal: l.codePostal,
+      dirigeantPrincipal: l.dirigeantPrincipal,
+      email: l.email,
+      leadScore: l.leadScore,
+    })),
+    [filtered],
+  );
+
+  // LeadEntry is a structural superset of KanbanLead — all required fields are
+  // present — so we can skip the redundant per-element spread that was creating
+  // new object references on every render.
+  const kanbanLeads = filtered as unknown as KanbanLead[];
+
+  // ── Stable callbacks for view-mode and sector select ─────────────────────
+  const handleViewModeChange = useCallback(
+    (v: string) => setViewMode(v as 'list' | 'kanban' | 'carte'),
+    [],
+  );
+
+  const handleSecteurChange = useCallback(
+    (v: string) => setStoreSecteur(v === 'all' ? '' : v),
+    [setStoreSecteur],
+  );
+
+  // ── Stable callback passed to ProspectKanban / ProspectMapView ────────────
+  const handleCardClick = useCallback((id: string) => setSheetId(id), []);
+
+  const handleAddToCampaign = useCallback((siren: string) => {
+    toggleOne(siren);
+    setViewMode('list');
+  }, []);
 
   function toggleAll() {
     setSelected(prev => {
@@ -1449,7 +1491,7 @@ export function Prospection() {
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
           <div>
             {/* View tabs (Chantier 9 + 11) */}
-            <Tabs value={viewMode} onValueChange={v => setViewMode(v as 'list' | 'kanban' | 'carte')}>
+            <Tabs value={viewMode} onValueChange={handleViewModeChange}>
               <TabsList className="h-8">
                 <TabsTrigger value="list" className="flex items-center gap-1.5 text-xs px-3 h-7">
                   <List className="w-3.5 h-3.5" /> Liste
@@ -1483,7 +1525,7 @@ export function Prospection() {
             {uniqueSectors.length > 0 && (
               <Select
                 value={storeSecteur || 'all'}
-                onValueChange={v => setStoreSecteur(v === 'all' ? '' : v)}
+                onValueChange={handleSecteurChange}
               >
                 <SelectTrigger className="h-8 text-xs w-48 border-gray-200">
                   <SelectValue placeholder="Filtrer par secteur" />
@@ -1605,21 +1647,8 @@ export function Prospection() {
         {/* ── Map view (Chantier 11) ───────────────────────────────────────── */}
         {viewMode === 'carte' && (
           <ProspectMapView
-            prospects={filtered.map(l => ({
-              siren: l.siren,
-              nomSociete: l.nomSociete,
-              formeJuridique: l.formeJuridique,
-              secteur: l.secteur,
-              ville: l.ville,
-              codePostal: l.codePostal,
-              dirigeantPrincipal: l.dirigeantPrincipal,
-              email: l.email,
-              leadScore: l.leadScore,
-            }))}
-            onAddToCampaign={siren => {
-              toggleOne(siren);
-              setViewMode('list');
-            }}
+            prospects={mapProspects}
+            onAddToCampaign={handleAddToCampaign}
           />
         )}
 
@@ -1627,23 +1656,9 @@ export function Prospection() {
         {viewMode === 'kanban' && (
           <div className="flex-1 overflow-hidden">
             <ProspectKanban
-              leads={filtered.map(l => ({
-                ...l,
-                id: l.id,
-                kanbanColumn: l.kanbanColumn,
-                openCount: l.openCount,
-                clicked: l.clicked,
-                emailSentAt: l.emailSentAt,
-                icebreakerIa: l.icebreakerIa,
-                sequenceStep: l.sequenceStep,
-                nextFollowUpDate: l.nextFollowUpDate,
-                callLogs: l.callLogs,
-                estimatedValue: l.estimatedValue,
-                nextActionDate: l.nextActionDate,
-                leadScore: l.leadScore,
-              }))}
+              leads={kanbanLeads}
               onMoveCard={moveCard}
-              onCardClick={id => setSheetId(id)}
+              onCardClick={handleCardClick}
             />
           </div>
         )}
