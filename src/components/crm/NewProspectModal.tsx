@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, User, Mail, Phone, Loader2 } from 'lucide-react';
+import { Building2, User, Mail, Phone, Loader2, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -8,6 +8,7 @@ import { Input } from '../../app/components/ui/input';
 import { Button } from '../../app/components/ui/button';
 import { Label } from '../../app/components/ui/label';
 import { useProspectStore } from '../../app/store/useProspectStore';
+import { searchProspects } from '../../app/services/prospectApi';
 
 interface NewProspectModalProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface NewProspectModalProps {
 
 interface FormState {
   company_name: string;
+  siren: string;
   contact_name: string;
   contact_email: string;
   contact_phone: string;
@@ -23,13 +25,14 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   company_name: '',
+  siren: '',
   contact_name: '',
   contact_email: '',
   contact_phone: '',
 };
 
 export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
-  const { addProspect } = useProspectStore();
+  const { addProspect, enrichProspectData } = useProspectStore();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
 
@@ -42,10 +45,53 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     onClose();
   };
 
+  /**
+   * After the prospect is saved, try to enrich it in the background by
+   * querying the API Sirene (recherche-entreprises.api.gouv.fr).
+   * Errors are swallowed — this is best-effort enrichment.
+   */
+  async function enrichInBackground(prospectId: string, siren: string, companyName: string) {
+    try {
+      const query = siren || companyName;
+      const result = await searchProspects({ q: query, perPage: 1 });
+      if (!result.success || result.prospects.length === 0) return;
+      const p = result.prospects[0];
+      // Only use the match if the SIREN matches (when one was provided)
+      if (siren && p.siren !== siren) return;
+      await enrichProspectData(prospectId, {
+        siren:                   p.siren || undefined,
+        siret:                   p.siret || undefined,
+        naf_code:                p.codeNAF || undefined,
+        libelle_naf:             p.libelleNAF || undefined,
+        secteur_activite:        p.secteur || undefined,
+        forme_juridique:         p.formeJuridique || undefined,
+        libelle_forme_juridique: p.libelleFormeJuridique || undefined,
+        address:                 p.adresse || undefined,
+        postal_code:             p.codePostal || undefined,
+        city:                    p.ville || undefined,
+        departement:             p.departement || undefined,
+        date_creation:           p.dateCreation || undefined,
+        effectif:                p.effectif || undefined,
+        capital_social:          p.capitalSocial || undefined,
+        categorie_entreprise:    p.categorieEntreprise || undefined,
+        dirigeants:              p.dirigeants,
+        dirigeant_principal:     p.dirigeantPrincipal as Record<string, unknown> | null | undefined,
+      });
+      toast.success('Fiche prospect enrichie depuis l\'API Sirene', { duration: 3000 });
+    } catch {
+      // Silently ignore enrichment errors
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.company_name.trim()) {
       toast.error('La raison sociale / nom du projet est obligatoire');
+      return;
+    }
+    const sirenTrimmed = form.siren.trim().replace(/\s/g, '');
+    if (sirenTrimmed && !/^\d{9}$/.test(sirenTrimmed)) {
+      toast.error('Le SIREN doit contenir exactement 9 chiffres');
       return;
     }
     const emailTrimmed = form.contact_email.trim();
@@ -56,17 +102,22 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     setLoading(true);
     try {
       const result = await addProspect({
-        company_name: form.company_name.trim(),
-        contact_name: form.contact_name.trim() || null,
+        company_name:  form.company_name.trim(),
+        siren:         sirenTrimmed || null,
+        contact_name:  form.contact_name.trim() || null,
         contact_email: emailTrimmed || null,
         contact_phone: form.contact_phone.trim() || null,
-        status: 'a-contacter',
+        status:        'a-contacter',
         kanban_column: 'a-contacter',
-        source: 'manuel',
+        source:        'manuel',
       });
       if (result.success) {
         toast.success('Prospect créé avec succès');
         handleClose();
+        // Enrich in background — fire-and-forget
+        if (result.id) {
+          void enrichInBackground(result.id, sirenTrimmed, form.company_name.trim());
+        }
       } else {
         toast.error(result.error ?? 'Impossible de créer le prospect. Veuillez vérifier votre connexion et réessayer.');
       }
@@ -98,6 +149,27 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
                 className="pl-9"
                 required
                 autoFocus
+              />
+            </div>
+          </div>
+
+          {/* SIREN */}
+          <div className="space-y-1.5">
+            <Label htmlFor="np-siren">
+              SIREN{' '}
+              <span className="text-gray-400 font-normal text-xs">(optionnel — enrichissement automatique)</span>
+            </Label>
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                id="np-siren"
+                placeholder="Ex : 123456789"
+                value={form.siren}
+                onChange={handleChange('siren')}
+                className="pl-9"
+                maxLength={9}
+                inputMode="numeric"
+                pattern="[0-9]{9}"
               />
             </div>
           </div>
