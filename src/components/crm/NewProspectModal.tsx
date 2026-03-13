@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Building2, User, Mail, Phone, Loader2, Hash, MapPin,
-  CheckCircle2, AlertCircle, ChevronDown,
+  CheckCircle2, AlertCircle, ChevronDown, Briefcase, Coins,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,6 +26,7 @@ interface NewProspectModalProps {
 interface FormState {
   company_name: string;
   siren: string;
+  siret: string;
   contact_name: string;
   contact_email: string;
   contact_phone: string;
@@ -36,11 +37,17 @@ interface FormState {
   naf_code: string;
   libelle_naf: string;
   secteur_activite: string;
+  capital_social: string;
+  effectif: string;
+  date_creation: string;
+  categorie_entreprise: string;
+  departement: string;
 }
 
 const EMPTY_FORM: FormState = {
   company_name: '',
   siren: '',
+  siret: '',
   contact_name: '',
   contact_email: '',
   contact_phone: '',
@@ -51,6 +58,11 @@ const EMPTY_FORM: FormState = {
   naf_code: '',
   libelle_naf: '',
   secteur_activite: '',
+  capital_social: '',
+  effectif: '',
+  date_creation: '',
+  categorie_entreprise: '',
+  departement: '',
 };
 
 /**
@@ -64,17 +76,35 @@ function applyApiData(prev: FormState, data: SirenData | CompanySuggestion): For
 
   return {
     ...prev,
-    company_name: data.nomComplet || prev.company_name,
-    siren:        data.siren || prev.siren,
-    address:      data.adresse || prev.address,
-    postal_code:  data.codePostal || prev.postal_code,
-    city:         data.ville || prev.city,
-    legal_form:   data.formeJuridique || prev.legal_form,
-    naf_code:     data.codeNAF || prev.naf_code,
-    libelle_naf:  data.libelleNAF || prev.libelle_naf,
-    contact_name: isFullData && full.nomDirigeant
+    company_name:         data.nomComplet || prev.company_name,
+    siren:                data.siren || prev.siren,
+    siret:                (isFullData ? full.siret : '') || prev.siret,
+    address:              data.adresse || prev.address,
+    postal_code:          data.codePostal || prev.postal_code,
+    city:                 data.ville || prev.city,
+    legal_form:           data.formeJuridique || prev.legal_form,
+    naf_code:             data.codeNAF || prev.naf_code,
+    libelle_naf:          data.libelleNAF || prev.libelle_naf,
+    // secteur_activite: use the NAF libellé as a human-readable sector label
+    secteur_activite:     data.libelleNAF || prev.secteur_activite,
+    capital_social:       (isFullData ? full.capitalSocial : '') || prev.capital_social,
+    effectif:             (isFullData ? full.effectif : '') || prev.effectif,
+    date_creation:        (isFullData ? full.dateCreation : '') || prev.date_creation,
+    categorie_entreprise: (isFullData ? full.categorieEntreprise : '') || prev.categorie_entreprise,
+    contact_name:         isFullData && full.nomDirigeant
       ? [full.prenomDirigeant, full.nomDirigeant].filter(Boolean).join(' ')
       : prev.contact_name,
+  };
+}
+
+/** Build a dirigeant_principal JSONB object from SirenData */
+function buildDirigeantPrincipal(
+  data: SirenData
+): Record<string, unknown> | null {
+  if (!data.nomDirigeant) return null;
+  return {
+    nom:    data.nomDirigeant,
+    prenom: data.prenomDirigeant ?? '',
   };
 }
 
@@ -82,6 +112,9 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
   const { addProspect } = useProspectStore();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
+
+  // Keep a ref to the full SirenData so we can build dirigeant_principal on submit
+  const sirenDataRef = useRef<SirenData | null>(null);
 
   // SIREN lookup state
   const [sirenLookupState, setSirenLookupState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
@@ -114,6 +147,7 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     setSuggestions([]);
     setShowSuggestions(false);
     setSirenLookupState('idle');
+    sirenDataRef.current = null;
     onClose();
   };
 
@@ -122,6 +156,7 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     const raw = e.target.value.replace(/\D/g, '').slice(0, 9);
     setForm(prev => ({ ...prev, siren: raw }));
     setSirenLookupState('idle');
+    sirenDataRef.current = null;
 
     if (sirenDebounceRef.current) clearTimeout(sirenDebounceRef.current);
     if (raw.length !== 9) return;
@@ -131,6 +166,7 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
       try {
         const result = await fetchBySIREN(raw);
         if (result.success) {
+          sirenDataRef.current = result.data;
           setForm(prev => applyApiData(prev, result.data));
           setSirenLookupState('ok');
           toast.success('Informations récupérées depuis l\'API SIREN', { duration: 2500 });
@@ -148,6 +184,7 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     const value = e.target.value;
     setForm(prev => ({ ...prev, company_name: value }));
     setSirenLookupState('idle');
+    sirenDataRef.current = null;
 
     if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
     if (value.trim().length < 3) {
@@ -202,23 +239,32 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
     setLoading(true);
     try {
       const result = await addProspect({
-        company_name:     form.company_name.trim(),
-        siren:            sirenTrimmed || null,
-        contact_name:     form.contact_name.trim() || null,
-        contact_email:    emailTrimmed || null,
-        contact_phone:    form.contact_phone.trim() || null,
-        address:          form.address.trim() || null,
-        postal_code:      form.postal_code.trim() || null,
-        city:             form.city.trim() || null,
-        legal_form:       form.legal_form.trim() || null,
+        company_name:            form.company_name.trim(),
+        siren:                   sirenTrimmed || null,
+        siret:                   form.siret.trim() || null,
+        contact_name:            form.contact_name.trim() || null,
+        contact_email:           emailTrimmed || null,
+        contact_phone:           form.contact_phone.trim() || null,
+        address:                 form.address.trim() || null,
+        postal_code:             form.postal_code.trim() || null,
+        city:                    form.city.trim() || null,
+        legal_form:              form.legal_form.trim() || null,
         // forme_juridique mirrors legal_form — the DB has both columns for legacy reasons
-        forme_juridique:  form.legal_form.trim() || null,
-        naf_code:         form.naf_code.trim() || null,
-        libelle_naf:      form.libelle_naf.trim() || null,
-        secteur_activite: form.secteur_activite.trim() || null,
-        status:           'a-contacter',
-        kanban_column:    'a-contacter',
-        source:           'manuel',
+        forme_juridique:         form.legal_form.trim() || null,
+        naf_code:                form.naf_code.trim() || null,
+        libelle_naf:             form.libelle_naf.trim() || null,
+        secteur_activite:        form.secteur_activite.trim() || null,
+        capital_social:          form.capital_social.trim() || null,
+        effectif:                form.effectif.trim() || null,
+        date_creation:           form.date_creation.trim() || null,
+        categorie_entreprise:    form.categorie_entreprise.trim() || null,
+        departement:             form.departement.trim() || null,
+        dirigeant_principal:     sirenDataRef.current
+          ? buildDirigeantPrincipal(sirenDataRef.current)
+          : null,
+        status:                  'a-contacter',
+        kanban_column:           'a-contacter',
+        source:                  'manuel',
       });
       if (result.success) {
         toast.success('Prospect créé avec succès');
@@ -379,6 +425,59 @@ export function NewProspectModal({ open, onClose }: NewProspectModalProps) {
               value={form.legal_form}
               onChange={handleChange('legal_form')}
             />
+          </div>
+
+          {/* NAF code + libellé */}
+          <div className="grid grid-cols-5 gap-2">
+            <div className="col-span-2 space-y-1.5">
+              <Label htmlFor="np-naf">Code NAF / APE</Label>
+              <div className="relative">
+                <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="np-naf"
+                  placeholder="Ex : 6920Z"
+                  value={form.naf_code}
+                  onChange={handleChange('naf_code')}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="col-span-3 space-y-1.5">
+              <Label htmlFor="np-naf-libelle">Activité (libellé NAF)</Label>
+              <Input
+                id="np-naf-libelle"
+                placeholder="Ex : Activités comptables"
+                value={form.libelle_naf}
+                onChange={handleChange('libelle_naf')}
+                className="bg-gray-50"
+              />
+            </div>
+          </div>
+
+          {/* Capital social + Effectif */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="np-capital">Capital social</Label>
+              <div className="relative">
+                <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  id="np-capital"
+                  placeholder="Ex : 10 000 €"
+                  value={form.capital_social}
+                  onChange={handleChange('capital_social')}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="np-effectif">Effectif</Label>
+              <Input
+                id="np-effectif"
+                placeholder="Ex : 1 à 2"
+                value={form.effectif}
+                onChange={handleChange('effectif')}
+              />
+            </div>
           </div>
 
           {/* Contact info */}
